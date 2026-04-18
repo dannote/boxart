@@ -89,9 +89,7 @@ defmodule Boxart.Graph do
 
     @type t :: %__MODULE__{
             id: String.t(),
-            source: String.t() | nil,
-            language: atom() | nil,
-            label: String.t(),
+            label: String.t() | nil,
             shape: Boxart.Graph.node_shape(),
             source: String.t() | nil,
             start_line: integer(),

@@ -164,6 +164,7 @@ defmodule Boxart.Render do
         end)
       end)
 
+    # +4 margin for edge routing that extends beyond node bounds
     width = max(layout.canvas_width + 4, extra_w)
     height = max(layout.canvas_height + 4, extra_h)
 
@@ -652,7 +653,7 @@ defmodule Boxart.Render do
 
         offsets
         |> List.flatten()
-        |> try_place_positions_list(canvas, label, placed)
+        |> then(&try_place_positions(canvas, &1, label, placed))
     end
   end
 
@@ -684,15 +685,6 @@ defmodule Boxart.Render do
     case try_place_label(canvas, row, col, label, placed) do
       {:ok, canvas, placed} -> {:ok, canvas, placed}
       :failed -> try_place_positions(canvas, rest, label, placed)
-    end
-  end
-
-  defp try_place_positions_list([], _canvas, _label, _placed), do: :failed
-
-  defp try_place_positions_list([{row, col} | rest], canvas, label, placed) do
-    case try_place_label(canvas, row, col, label, placed) do
-      {:ok, canvas, placed} -> {:ok, canvas, placed}
-      :failed -> try_place_positions_list(rest, canvas, label, placed)
     end
   end
 

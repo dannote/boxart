@@ -1,4 +1,6 @@
 defmodule Boxart.Layout.Subgraphs do
+  alias Boxart.Utils
+
   @moduledoc """
   Subgraph layout handling for the layout engine.
 
@@ -227,7 +229,7 @@ defmodule Boxart.Layout.Subgraphs do
       end)
 
     content_width = max_x - min_x + @sg_border_pad * 2
-    label_width = String.length(sg.label) + 4
+    label_width = Utils.display_width(sg.label) + 4
     final_width = max(content_width, label_width)
 
     %SubgraphBounds{

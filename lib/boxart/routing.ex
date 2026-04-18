@@ -29,6 +29,7 @@ defmodule Boxart.Routing do
             occupied_cells: MapSet.t({integer(), integer()})
           }
 
+    @enforce_keys [:edge]
     defstruct edge: nil,
               grid_path: [],
               draw_path: [],
@@ -272,7 +273,7 @@ defmodule Boxart.Routing do
       draw_path: draw_path,
       start_dir: start_dir,
       end_dir: end_dir,
-      label: Map.get(edge, :label, ""),
+      label: edge.label,
       occupied_cells: occupied
     }
   end
@@ -319,7 +320,7 @@ defmodule Boxart.Routing do
       draw_path: draw_path,
       start_dir: :top,
       end_dir: :right,
-      label: Map.get(edge, :label, ""),
+      label: edge.label,
       occupied_cells: MapSet.new(path)
     }
   end
@@ -438,7 +439,7 @@ defmodule Boxart.Routing do
 
   # --- Layout delegation ---
 
-  defp layout_free?(%{grid_occupied: occupied}, col, row) do
+  defp layout_free?(%Boxart.Layout{grid_occupied: occupied}, col, row) do
     col >= 0 and row >= 0 and not Map.has_key?(occupied, {col, row})
   end
 

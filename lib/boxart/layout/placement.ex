@@ -239,13 +239,16 @@ defmodule Boxart.Layout.Placement do
     |> ensure_row_height(row, content_height)
   end
 
+  defp collect_grid_cells(layout) do
+    Enum.reduce(layout.placements, {MapSet.new(), MapSet.new()}, fn {_nid, p}, {cols, rows} ->
+      cols = for dc <- -1..1, reduce: cols, do: (acc -> MapSet.put(acc, p.grid.col + dc))
+      rows = for dr <- -1..1, reduce: rows, do: (acc -> MapSet.put(acc, p.grid.row + dr))
+      {cols, rows}
+    end)
+  end
+
   defp set_border_cell_defaults(layout) do
-    {all_cols, all_rows} =
-      Enum.reduce(layout.placements, {MapSet.new(), MapSet.new()}, fn {_nid, p}, {cols, rows} ->
-        cols = for dc <- -1..1, reduce: cols, do: (acc -> MapSet.put(acc, p.grid.col + dc))
-        rows = for dr <- -1..1, reduce: rows, do: (acc -> MapSet.put(acc, p.grid.row + dr))
-        {cols, rows}
-      end)
+    {all_cols, all_rows} = collect_grid_cells(layout)
 
     layout =
       Enum.reduce(all_cols, layout, fn c, l ->
@@ -262,12 +265,7 @@ defmodule Boxart.Layout.Placement do
   end
 
   defp set_gap_cell_defaults(layout, gap) do
-    {all_cols, all_rows} =
-      Enum.reduce(layout.placements, {MapSet.new(), MapSet.new()}, fn {_nid, p}, {cols, rows} ->
-        cols = for dc <- -1..1, reduce: cols, do: (acc -> MapSet.put(acc, p.grid.col + dc))
-        rows = for dr <- -1..1, reduce: rows, do: (acc -> MapSet.put(acc, p.grid.row + dr))
-        {cols, rows}
-      end)
+    {all_cols, all_rows} = collect_grid_cells(layout)
 
     max_col = if MapSet.size(all_cols) > 0, do: Enum.max(all_cols), else: 0
     max_row = if MapSet.size(all_rows) > 0, do: Enum.max(all_rows), else: 0
