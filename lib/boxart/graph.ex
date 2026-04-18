@@ -279,7 +279,7 @@ defmodule Boxart.Graph do
       label: edge_label(Keyword.get(label, :label) || Keyword.get(label, :text, "")),
       style: Keyword.get(label, :style, :solid),
       has_arrow_start: bidirectional,
-      has_arrow_end: has_arrow != false,
+      has_arrow_end: has_arrow == true,
       arrow_type_start: arrow_type_from(Keyword.get(label, :arrow_type, :arrow)),
       arrow_type_end: arrow_type_from(Keyword.get(label, :arrow_type, :arrow)),
       min_length: Keyword.get(label, :min_length, 1)
@@ -295,7 +295,14 @@ defmodule Boxart.Graph do
   end
 
   defp arrow_type_from(t) when t in [:arrow, :circle, :cross], do: t
-  defp arrow_type_from(_), do: :arrow
+  defp arrow_type_from(nil), do: :arrow
+
+  defp arrow_type_from(t),
+    do:
+      raise(
+        ArgumentError,
+        "invalid arrow_type: #{inspect(t)}, expected :arrow, :circle, or :cross"
+      )
 
   defp to_id(v) when is_binary(v), do: v
   defp to_id(v) when is_atom(v), do: Atom.to_string(v)

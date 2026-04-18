@@ -136,25 +136,21 @@ defmodule Boxart.Render.GitGraph do
     |> Canvas.render()
   end
 
+  @tb_row_gap 4
+  @tb_header_rows 3
+
   defp render_tb(diagram, cs, use_ascii, dir) do
     sorted = sort_branches(diagram)
     commit_map = Map.new(diagram.commits, &{&1.id, &1})
     branch_commits = group_commits_by_branch(diagram.commits, sorted)
 
-    max_label_w =
-      (Enum.map(sorted, &Utils.display_width/1) ++
-         Enum.map(diagram.commits, fn c ->
-           w = Utils.display_width(c.id)
-           if c.tag != "", do: max(w, Utils.display_width(c.tag) + 2), else: w
-         end))
-      |> Enum.max(fn -> 0 end)
-
-    col_gap = max(max_label_w + 4, 10)
+    max_branch_w = sorted |> Enum.map(&Utils.display_width/1) |> Enum.max(fn -> 0 end)
+    col_gap = max(max_branch_w + 4, 10)
 
     branch_col =
       sorted |> Enum.with_index() |> Map.new(fn {name, i} -> {name, @margin + i * col_gap} end)
 
-    row_gap = 4
+    row_gap = @tb_row_gap
     n = length(diagram.commits)
     label_row = @margin
 
@@ -169,7 +165,7 @@ defmodule Boxart.Render.GitGraph do
       end)
 
     width = @margin + length(sorted) * col_gap + @margin
-    height = @margin + 3 + n * row_gap + @margin
+    height = @margin + @tb_header_rows + n * row_gap + @margin
     canvas = Canvas.new(width, height)
 
     v = cs.lines.vertical
@@ -180,7 +176,7 @@ defmodule Boxart.Render.GitGraph do
       Enum.reduce(sorted, canvas, fn name, acc ->
         col = Map.get(branch_col, name, 0)
         lx = col - div(Utils.display_width(name), 2)
-        row = if dir == :bt, do: @margin + n * row_gap + 3, else: label_row
+        row = if dir == :bt, do: @margin + n * row_gap + @tb_header_rows, else: label_row
         Canvas.put_text(acc, max(0, lx), row, name, style: "subgraph")
       end)
 

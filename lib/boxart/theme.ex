@@ -28,6 +28,8 @@ defmodule Boxart.Theme do
       Boxart.render(graph, theme: my_theme)
   """
 
+  require Logger
+
   @type ansi_style :: [atom()]
 
   @type t :: %__MODULE__{
@@ -61,7 +63,6 @@ defmodule Boxart.Theme do
   def get(:phosphor), do: phosphor()
 
   def get(name) do
-    require Logger
     Logger.warning("Unknown Boxart theme: #{inspect(name)}, using :default")
     default()
   end

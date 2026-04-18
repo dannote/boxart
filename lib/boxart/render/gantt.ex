@@ -288,11 +288,13 @@ defmodule Boxart.Render.Gantt do
   defp truncate_by_width(text, max_w) do
     text
     |> String.graphemes()
-    |> Enum.reduce_while({"", 0}, fn ch, {acc, w} ->
+    |> Enum.reduce_while({[], 0}, fn ch, {acc, w} ->
       cw = Utils.display_width(ch)
-      if w + cw >= max_w, do: {:halt, {acc, w}}, else: {:cont, {acc <> ch, w + cw}}
+      if w + cw >= max_w, do: {:halt, {acc, w}}, else: {:cont, {[ch | acc], w + cw}}
     end)
     |> elem(0)
+    |> Enum.reverse()
+    |> Enum.join()
     |> Kernel.<>(".")
   end
 end
