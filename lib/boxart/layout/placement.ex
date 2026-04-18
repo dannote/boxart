@@ -197,7 +197,7 @@ defmodule Boxart.Layout.Placement do
       )
 
     content_width = code_label.width + 4
-    content_height = code_label.height + 2
+    content_height = code_label.height
 
     col = placement.grid.col
     row = placement.grid.row
