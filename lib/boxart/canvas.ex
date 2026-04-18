@@ -329,6 +329,18 @@ defmodule Boxart.Canvas do
   end
 
   @doc """
+  Check if a horizontal range of cells on `row` contains only spaces.
+  Returns `true` if every cell from `col_start` to `col_end - 1` is empty.
+  """
+  @spec clear_range?(t(), integer(), integer(), integer()) :: boolean()
+  def clear_range?(%__MODULE__{} = canvas, row, col_start, col_end) do
+    Enum.all?(col_start..(col_end - 1)//1, fn c ->
+      cell = Map.get(canvas.cells, {c, row}, %Cell{})
+      cell.char == " " or cell.char == ""
+    end)
+  end
+
+  @doc """
   Render canvas to a string, trimming trailing whitespace per line
   and removing both leading and trailing empty lines.
   """

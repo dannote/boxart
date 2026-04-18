@@ -563,12 +563,18 @@ defmodule Boxart.Render do
           {canvas, placed}
 
         :failed ->
-          mid_idx = div(length(path), 2)
-          {mx, my} = Enum.at(path, mid_idx)
-          canvas = Canvas.put_text(canvas, mx + 1, my - 1, label)
-          placed = [{my - 1, mx + 1, mx + 1 + label_len} | placed]
-          {canvas, placed}
+          try_fallback_label(canvas, path, label, placed)
       end
+    end
+  end
+
+  defp try_fallback_label(canvas, path, label, placed) do
+    mid_idx = div(length(path), 2)
+    {mx, my} = Enum.at(path, mid_idx)
+
+    case try_place_label(canvas, my - 1, mx + 1, label, placed) do
+      {:ok, canvas, placed} -> {canvas, placed}
+      :failed -> {canvas, placed}
     end
   end
 
@@ -695,15 +701,20 @@ defmodule Boxart.Render do
   defp try_place_label(canvas, row, col, label, placed) do
     col_end = col + Utils.display_width(label)
 
-    if label_overlaps?(row, placed) do
-      :failed
-    else
-      canvas =
-        canvas
-        |> Canvas.resize(col_end + 1, row + 1)
-        |> Canvas.put_text(col, row, label)
+    cond do
+      label_overlaps?(row, placed) ->
+        :failed
 
-      {:ok, canvas, [{row, col, col_end} | placed]}
+      not Canvas.clear_range?(canvas, row, col, col_end) ->
+        :failed
+
+      true ->
+        canvas =
+          canvas
+          |> Canvas.resize(col_end + 1, row + 1)
+          |> Canvas.put_text(col, row, label)
+
+        {:ok, canvas, [{row, col, col_end} | placed]}
     end
   end
 

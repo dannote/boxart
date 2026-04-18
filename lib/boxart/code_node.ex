@@ -62,8 +62,8 @@ defmodule Boxart.CodeNode do
       |> Enum.map(&Boxart.Utils.display_width/1)
       |> Enum.max(fn -> 0 end)
 
-    # gutter + separator + space + code
-    width = gutter_width + 2 + max_code_width
+    # gutter + separator(│) + space + code
+    width = gutter_width + 3 + max_code_width
 
     %CodeLabel{
       lines: lines,
@@ -84,10 +84,15 @@ defmodule Boxart.CodeNode do
           CodeLabel.t(),
           any()
         ) :: Canvas.t()
-  def render_to_canvas(canvas, x, y, width, height, %CodeLabel{} = code_label, _charset) do
+  def render_to_canvas(canvas, x, y, _width, height, %CodeLabel{} = code_label, _charset) do
     content_start_y = y + 1
     content_start_x = x + 1
-    available_width = width - 2
+
+    # Draw the gutter separator as a continuous vertical line
+    {gutter_w, _} = gutter_width(code_label)
+    sep_col = content_start_x + gutter_w
+
+    canvas = draw_gutter_separator(canvas, sep_col, y, height)
 
     code_label.lines
     |> Enum.with_index()
@@ -96,17 +101,33 @@ defmodule Boxart.CodeNode do
 
       if row >= y + height - 1,
         do: acc,
-        else: draw_code_line(acc, content_start_x, row, num_str, code, available_width)
+        else: draw_code_line(acc, content_start_x, row, num_str, code, sep_col)
     end)
   end
 
-  defp draw_code_line(canvas, x, row, num_str, code, _available_width) do
+  defp gutter_width(%CodeLabel{lines: [{num_str, _} | _]}),
+    do: {String.length(num_str), num_str}
+
+  defp gutter_width(_), do: {1, "0"}
+
+  defp draw_gutter_separator(canvas, sep_col, y, height) do
+    # Top border connection
+    canvas = Canvas.put(canvas, sep_col, y, "┬", style: "dim")
+
+    # Vertical line through content area
+    canvas =
+      Enum.reduce((y + 1)..(y + height - 2)//1, canvas, fn row, acc ->
+        Canvas.put(acc, sep_col, row, "│", merge: false, style: "dim")
+      end)
+
+    # Bottom border connection
+    Canvas.put(canvas, sep_col, y + height - 1, "┴", style: "dim")
+  end
+
+  defp draw_code_line(canvas, x, row, num_str, code, sep_col) do
     canvas = Canvas.put_text(canvas, x, row, num_str, style: "dim")
 
-    sep_x = x + String.length(num_str)
-    canvas = Canvas.put(canvas, sep_x, row, "│", merge: false, style: "dim")
-
-    code_x = sep_x + 1
+    code_x = sep_col + 2
 
     case code do
       segments when is_list(segments) ->
