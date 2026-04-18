@@ -17,7 +17,7 @@ defmodule Boxart.Render do
   alias Boxart.Canvas
   alias Boxart.Charset
   alias Boxart.CodeNode
-  alias Boxart.Graph
+  alias Boxart.Graph, as: BGraph
   alias Boxart.Layout
   alias Boxart.Render.Shapes
   alias Boxart.Routing
@@ -35,7 +35,7 @@ defmodule Boxart.Render do
 
   Returns `""` for empty graphs.
   """
-  @spec render_graph(Graph.t(), render_opts()) :: String.t()
+  @spec render_graph(BGraph.t(), render_opts()) :: String.t()
   def render_graph(graph, opts \\ []) do
     max_width = Keyword.get(opts, :max_width)
 
@@ -58,8 +58,43 @@ defmodule Boxart.Render do
       output
     else
       shrunk = try_shrink_labels(graph, opts, max_width)
-      clamp_width(shrunk, max_width)
+
+      shrunk_w =
+        shrunk |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
+
+      if shrunk_w <= max_width do
+        shrunk
+      else
+        try_mindmap_fallback(graph, opts, max_width, shrunk)
+      end
     end
+  end
+
+  defp try_mindmap_fallback(graph, opts, max_width, fallback) do
+    libgraph = internal_to_libgraph(graph)
+    mindmap_output = Boxart.Render.Mindmap.render(libgraph, Keyword.take(opts, [:charset]))
+
+    mindmap_w =
+      mindmap_output |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
+
+    if mindmap_w <= max_width and mindmap_output != "" do
+      mindmap_output
+    else
+      clamp_width(fallback, max_width)
+    end
+  end
+
+  defp internal_to_libgraph(%Boxart.Graph{} = g) do
+    lg =
+      Enum.reduce(g.node_order, Graph.new(), fn nid, acc ->
+        node = Map.get(g.nodes, nid)
+        label = if node, do: [label: node.label], else: []
+        Graph.add_vertex(acc, nid, label)
+      end)
+
+    Enum.reduce(g.edges, lg, fn e, acc ->
+      Graph.add_edge(acc, e.source, e.target)
+    end)
   end
 
   defp render_canvas_to_string(canvas, opts) do
@@ -129,9 +164,9 @@ defmodule Boxart.Render do
   Returns `nil` for empty graphs.
   """
   @spec render_graph_canvas(Graph.t(), render_opts()) :: Canvas.t() | nil
-  def render_graph_canvas(%Graph{node_order: []} = _graph, _opts), do: nil
+  def render_graph_canvas(%BGraph{node_order: []} = _graph, _opts), do: nil
 
-  def render_graph_canvas(%Graph{} = graph, opts) do
+  def render_graph_canvas(%BGraph{} = graph, opts) do
     cs = charset_from_opts(opts)
     layout_opts = Keyword.take(opts, [:padding_x, :padding_y, :gap, :max_label_width])
 
@@ -152,11 +187,11 @@ defmodule Boxart.Render do
 
   # -- Direction normalization --
 
-  defp normalize_direction(%Graph{direction: :bt} = graph) do
+  defp normalize_direction(%BGraph{direction: :bt} = graph) do
     {%{graph | direction: :tb}, true, false}
   end
 
-  defp normalize_direction(%Graph{direction: :rl} = graph) do
+  defp normalize_direction(%BGraph{direction: :rl} = graph) do
     {%{graph | direction: :lr}, false, true}
   end
 

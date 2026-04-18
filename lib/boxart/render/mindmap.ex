@@ -126,13 +126,13 @@ defmodule Boxart.Render.Mindmap do
 
   defp vertex_label(graph, vertex) do
     case Graph.vertex_labels(graph, vertex) do
-      [] -> to_string(vertex)
+      [] -> inspect(vertex)
       labels -> find_label(labels, vertex)
     end
   end
 
   defp find_label(labels, vertex) do
-    Enum.find_value(labels, to_string(vertex), fn
+    Enum.find_value(labels, inspect(vertex), fn
       {key, val} when key == :label ->
         to_string(val)
 
