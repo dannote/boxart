@@ -90,11 +90,14 @@ defmodule Boxart.Graph do
     @type t :: %__MODULE__{
             id: String.t(),
             label: String.t(),
-            shape: Boxart.Graph.node_shape()
+            shape: Boxart.Graph.node_shape(),
+            source: String.t() | nil,
+            start_line: integer(),
+            language: atom() | nil
           }
 
     @enforce_keys [:id]
-    defstruct [:id, label: nil, shape: :rectangle]
+    defstruct [:id, :source, :language, label: nil, shape: :rectangle, start_line: 1]
 
     @doc "Creates a new node. Label defaults to the id when omitted."
     @spec new(String.t(), keyword()) :: t()
@@ -102,7 +105,10 @@ defmodule Boxart.Graph do
       %__MODULE__{
         id: id,
         label: Keyword.get(opts, :label, id),
-        shape: Keyword.get(opts, :shape, :rectangle)
+        shape: Keyword.get(opts, :shape, :rectangle),
+        source: Keyword.get(opts, :source),
+        start_line: Keyword.get(opts, :start_line, 1),
+        language: Keyword.get(opts, :language)
       }
     end
   end
@@ -185,6 +191,9 @@ defmodule Boxart.Graph do
 
     * `:label` — display text (defaults to `inspect(vertex)`)
     * `:shape` — node shape atom (default: `:rectangle`)
+    * `:source` — raw source code string (renders as a code block instead of label)
+    * `:start_line` — starting line number for code display (default: `1`)
+    * `:language` — language atom for syntax highlighting (e.g. `:elixir`)
 
   Edge labels become the display text on the edge.
 
@@ -203,7 +212,19 @@ defmodule Boxart.Graph do
         labels = Graph.vertex_labels(libgraph, v)
         label = label_from_vertex(v, labels)
         shape = shape_from_labels(labels)
-        {id, %Node{id: id, label: label, shape: shape}}
+        source = find_label_value(labels, :source)
+        start_line = find_label_value(labels, :start_line) || 1
+        language = find_label_value(labels, :language)
+
+        {id,
+         %Node{
+           id: id,
+           label: label,
+           shape: shape,
+           source: source,
+           start_line: start_line,
+           language: language
+         }}
       end)
 
     node_order = Enum.map(vertices, &to_id/1)

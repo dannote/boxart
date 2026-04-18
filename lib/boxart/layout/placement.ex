@@ -52,13 +52,7 @@ defmodule Boxart.Layout.Placement do
       Enum.reduce(layout.placements, layout, fn {nid, placement}, l ->
         node = Map.fetch!(graph.nodes, nid)
 
-        if node.shape == :junction do
-          l
-          |> ensure_col_width(placement.grid.col, 1)
-          |> ensure_row_height(placement.grid.row, 1)
-        else
-          compute_node_size(l, node, placement, padding_x, padding_y)
-        end
+        compute_node_content_size(l, node, placement, padding_x, padding_y)
       end)
 
     layout
@@ -178,6 +172,39 @@ defmodule Boxart.Layout.Placement do
       end
 
     %{layout | grid_occupied: occupied}
+  end
+
+  defp compute_node_content_size(layout, %{shape: :junction} = _node, placement, _px, _py) do
+    layout
+    |> ensure_col_width(placement.grid.col, 1)
+    |> ensure_row_height(placement.grid.row, 1)
+  end
+
+  defp compute_node_content_size(layout, %{source: source} = node, placement, _px, _py)
+       when not is_nil(source) do
+    compute_code_node_size(layout, node, placement)
+  end
+
+  defp compute_node_content_size(layout, node, placement, padding_x, padding_y) do
+    compute_node_size(layout, node, placement, padding_x, padding_y)
+  end
+
+  defp compute_code_node_size(layout, node, placement) do
+    code_label =
+      Boxart.CodeNode.format_label(node.source,
+        start_line: node.start_line,
+        language: node.language
+      )
+
+    content_width = code_label.width + 4
+    content_height = code_label.height + 2
+
+    col = placement.grid.col
+    row = placement.grid.row
+
+    layout
+    |> ensure_col_width(col, content_width)
+    |> ensure_row_height(row, content_height)
   end
 
   defp compute_node_size(layout, node, placement, padding_x, padding_y) do

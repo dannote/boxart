@@ -24,6 +24,20 @@ defmodule Boxart do
     * `:label` — display text inside the node (defaults to `inspect(vertex)`)
     * `:shape` — node shape atom (`:rectangle`, `:diamond`, `:rounded`, `:hexagon`,
       `:stadium`, `:circle`, `:cylinder`, etc.)
+    * `:source` — raw source code string (renders as a code block with line numbers)
+    * `:start_line` — first line number for code display (default: `1`)
+    * `:language` — language atom for syntax highlighting (e.g. `:elixir`)
+
+  ## Code nodes
+
+  When a vertex has a `:source` label, it renders as a code block with line
+  numbers and optional syntax highlighting:
+
+      Graph.add_vertex(g, "block",
+        source: "x = fetch(url)\ncase decode(x)",
+        start_line: 5,
+        language: :elixir
+      )
 
   ## Edge labels
 

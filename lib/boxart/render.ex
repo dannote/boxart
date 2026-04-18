@@ -16,6 +16,7 @@ defmodule Boxart.Render do
 
   alias Boxart.Canvas
   alias Boxart.Charset
+  alias Boxart.CodeNode
   alias Boxart.Graph
   alias Boxart.Layout
   alias Boxart.Render.Shapes
@@ -175,17 +176,46 @@ defmodule Boxart.Render do
   defp draw_node(canvas, graph, nid, p, cs) do
     node = Map.fetch!(graph.nodes, nid)
 
-    canvas
-    |> Shapes.draw_shape(
-      node.shape,
-      p.draw_x,
-      p.draw_y,
-      p.draw_width,
-      p.draw_height,
-      node.label || nid,
-      cs
-    )
-    |> protect_node_cells(p)
+    canvas =
+      if node.source do
+        code_label =
+          CodeNode.format_label(node.source,
+            start_line: node.start_line,
+            language: node.language
+          )
+
+        canvas
+        |> Shapes.draw_shape(
+          node.shape,
+          p.draw_x,
+          p.draw_y,
+          p.draw_width,
+          p.draw_height,
+          "",
+          cs
+        )
+        |> CodeNode.render_to_canvas(
+          p.draw_x,
+          p.draw_y,
+          p.draw_width,
+          p.draw_height,
+          code_label,
+          cs
+        )
+      else
+        Shapes.draw_shape(
+          canvas,
+          node.shape,
+          p.draw_x,
+          p.draw_y,
+          p.draw_width,
+          p.draw_height,
+          node.label || nid,
+          cs
+        )
+      end
+
+    protect_node_cells(canvas, p)
   end
 
   defp protect_node_cells(canvas, p) do
