@@ -7,6 +7,7 @@ defmodule Boxart.Layout.Layers do
   """
 
   alias Boxart.Graph
+  alias Boxart.Graph.Edge
 
   @doc """
   Assign each node to a layer based on longest path from a root.
@@ -94,29 +95,31 @@ defmodule Boxart.Layout.Layers do
     {node_layer, node_pos} = build_layer_pos_lookup(layer_order)
 
     graph.edges
-    |> Enum.reject(&Boxart.Graph.Edge.self_reference?(&1))
-    |> Enum.reduce(%{}, fn edge, acc ->
-      with src_layer when is_integer(src_layer) <- Map.get(node_layer, edge.source),
-           tgt_layer when is_integer(tgt_layer) <- Map.get(node_layer, edge.target),
-           src_p when is_integer(src_p) <- Map.get(node_pos, edge.source),
-           tgt_p when is_integer(tgt_p) <- Map.get(node_pos, edge.target),
-           true <- src_p != tgt_p do
-        lo = min(src_layer, tgt_layer)
-        hi = max(src_layer, tgt_layer)
-
-        Enum.reduce(lo..(hi - 1)//1, acc, fn gap_idx, acc2 ->
-          Map.update(acc2, gap_idx, 1, &(&1 + 1))
-        end)
-      else
-        _ -> acc
-      end
-    end)
+    |> Enum.reject(&Edge.self_reference?(&1))
+    |> Enum.reduce(%{}, &accumulate_gap_crossings(&1, &2, node_layer, node_pos))
     |> Map.new(fn {gap, n} -> {gap, max(0, n - 1)} end)
     |> Enum.reject(fn {_gap, extra} -> extra == 0 end)
     |> Map.new()
   end
 
   # --- Private helpers ---
+
+  defp accumulate_gap_crossings(edge, acc, node_layer, node_pos) do
+    with src_layer when is_integer(src_layer) <- Map.get(node_layer, edge.source),
+         tgt_layer when is_integer(tgt_layer) <- Map.get(node_layer, edge.target),
+         src_p when is_integer(src_p) <- Map.get(node_pos, edge.source),
+         tgt_p when is_integer(tgt_p) <- Map.get(node_pos, edge.target),
+         true <- src_p != tgt_p do
+      lo = min(src_layer, tgt_layer)
+      hi = max(src_layer, tgt_layer)
+
+      Enum.reduce(lo..(hi - 1)//1, acc, fn gap_idx, acc2 ->
+        Map.update(acc2, gap_idx, 1, &(&1 + 1))
+      end)
+    else
+      _ -> acc
+    end
+  end
 
   defp discover_tree_edges(%Graph{} = graph, roots) do
     {_visited, tree_edges} =
@@ -156,17 +159,18 @@ defmodule Boxart.Layout.Layers do
 
         {visited, edges, queue} =
           Enum.reduce(children, {visited, edges, queue}, fn child, {v, e, q} ->
-            if MapSet.member?(v, child) do
-              {v, e, q}
-            else
-              v = MapSet.put(v, child)
-              e = MapSet.put(e, {node, child})
-              q = :queue.in(child, q)
-              {v, e, q}
-            end
+            visit_child(node, child, v, e, q)
           end)
 
         do_bfs_tree(graph, queue, visited, edges)
+    end
+  end
+
+  defp visit_child(parent, child, visited, edges, queue) do
+    if MapSet.member?(visited, child) do
+      {visited, edges, queue}
+    else
+      {MapSet.put(visited, child), MapSet.put(edges, {parent, child}), :queue.in(child, queue)}
     end
   end
 
@@ -186,24 +190,26 @@ defmodule Boxart.Layout.Layers do
 
   defp do_propagate(layers, tree_edges, edge_min_lengths, remaining, true) do
     {layers, changed} =
-      Enum.reduce(tree_edges, {layers, false}, fn {src, tgt}, {l, changed} ->
-        case Map.get(l, src) do
-          nil ->
-            {l, changed}
-
-          src_layer ->
-            ml = Map.get(edge_min_lengths, {src, tgt}, 1)
-            new_layer = src_layer + ml
-
-            if not Map.has_key?(l, tgt) or l[tgt] < new_layer do
-              {Map.put(l, tgt, new_layer), true}
-            else
-              {l, changed}
-            end
-        end
-      end)
+      Enum.reduce(tree_edges, {layers, false}, &propagate_edge(&1, &2, edge_min_lengths))
 
     do_propagate(layers, tree_edges, edge_min_lengths, remaining - 1, changed)
+  end
+
+  defp propagate_edge({src, tgt}, {layers, changed}, edge_min_lengths) do
+    case Map.get(layers, src) do
+      nil ->
+        {layers, changed}
+
+      src_layer ->
+        ml = Map.get(edge_min_lengths, {src, tgt}, 1)
+        new_layer = src_layer + ml
+
+        if not Map.has_key?(layers, tgt) or layers[tgt] < new_layer do
+          {Map.put(layers, tgt, new_layer), true}
+        else
+          {layers, changed}
+        end
+    end
   end
 
   defp assign_unplaced(layers, node_order) do
@@ -262,17 +268,19 @@ defmodule Boxart.Layout.Layers do
   end
 
   defp compute_sg_ranges(layers, node_sg) do
-    Enum.reduce(layers, %{}, fn {nid, layer}, acc ->
-      case Map.get(node_sg, nid) do
-        nil ->
-          acc
+    Enum.reduce(layers, %{}, &update_sg_range(&1, &2, node_sg))
+  end
 
-        sg_id ->
-          Map.update(acc, sg_id, {layer, layer}, fn {lo, hi} ->
-            {min(lo, layer), max(hi, layer)}
-          end)
-      end
-    end)
+  defp update_sg_range({nid, layer}, acc, node_sg) do
+    case Map.get(node_sg, nid) do
+      nil ->
+        acc
+
+      sg_id ->
+        Map.update(acc, sg_id, {layer, layer}, fn {lo, hi} ->
+          {min(lo, layer), max(hi, layer)}
+        end)
+    end
   end
 
   defp has_overlap?(sg_ranges) do
@@ -305,20 +313,22 @@ defmodule Boxart.Layout.Layers do
     initial_succs = Map.new(sg_ids, &{&1, MapSet.new()})
     initial_deg = Map.new(sg_ids, &{&1, 0})
 
-    Enum.reduce(graph.edges, {initial_succs, initial_deg}, fn edge, {succs, deg} ->
-      s_sg = Map.get(node_sg, edge.source)
-      t_sg = Map.get(node_sg, edge.target)
+    Enum.reduce(graph.edges, {initial_succs, initial_deg}, &add_sg_dag_edge(&1, &2, node_sg))
+  end
 
-      if s_sg && t_sg && s_sg != t_sg && Map.has_key?(succs, s_sg) do
-        if MapSet.member?(succs[s_sg], t_sg) do
-          {succs, deg}
-        else
-          {Map.update!(succs, s_sg, &MapSet.put(&1, t_sg)), Map.update!(deg, t_sg, &(&1 + 1))}
-        end
-      else
+  defp add_sg_dag_edge(edge, {succs, deg}, node_sg) do
+    s_sg = Map.get(node_sg, edge.source)
+    t_sg = Map.get(node_sg, edge.target)
+
+    if s_sg && t_sg && s_sg != t_sg && Map.has_key?(succs, s_sg) do
+      if MapSet.member?(succs[s_sg], t_sg) do
         {succs, deg}
+      else
+        {Map.update!(succs, s_sg, &MapSet.put(&1, t_sg)), Map.update!(deg, t_sg, &(&1 + 1))}
       end
-    end)
+    else
+      {succs, deg}
+    end
   end
 
   defp topological_sort(sg_ids, succs, in_deg) do
@@ -387,39 +397,44 @@ defmodule Boxart.Layout.Layers do
 
   defp compute_internal_layers(graph, node_sg, topo) do
     Enum.reduce(topo, {%{}, %{}}, fn sg_id, {internals, sizes} ->
-      sg_nodes = for {nid, sid} <- node_sg, sid == sg_id, do: nid, into: MapSet.new()
-
-      int_edges =
-        graph.edges
-        |> Enum.filter(
-          &(MapSet.member?(sg_nodes, &1.source) and MapSet.member?(sg_nodes, &1.target))
-        )
-        |> Enum.reject(&Boxart.Graph.Edge.self_reference?(&1))
-
-      int_targets = MapSet.new(int_edges, & &1.target)
-
-      int_roots =
-        case Enum.reject(sg_nodes, &MapSet.member?(int_targets, &1)) do
-          [] -> [sg_nodes |> Enum.to_list() |> hd()]
-          roots -> roots
-        end
-
-      int_layers = Map.new(int_roots, &{&1, 0})
-
-      int_layers =
-        do_internal_propagate(int_layers, int_edges, MapSet.size(sg_nodes) * 2 + 1, true)
-
-      int_layers = Enum.reduce(sg_nodes, int_layers, fn nid, acc -> Map.put_new(acc, nid, 0) end)
-
-      size =
-        if map_size(int_layers) > 0 do
-          (int_layers |> Map.values() |> Enum.max()) + 1
-        else
-          0
-        end
-
+      {int_layers, size} = compute_sg_internal(graph, node_sg, sg_id)
       {Map.put(internals, sg_id, int_layers), Map.put(sizes, sg_id, size)}
     end)
+  end
+
+  defp compute_sg_internal(graph, node_sg, sg_id) do
+    sg_nodes = for {nid, sid} <- node_sg, sid == sg_id, do: nid, into: MapSet.new()
+
+    int_edges =
+      graph.edges
+      |> Enum.filter(
+        &(MapSet.member?(sg_nodes, &1.source) and MapSet.member?(sg_nodes, &1.target))
+      )
+      |> Enum.reject(&Edge.self_reference?(&1))
+
+    int_targets = MapSet.new(int_edges, & &1.target)
+
+    int_roots =
+      case Enum.reject(sg_nodes, &MapSet.member?(int_targets, &1)) do
+        [] -> [sg_nodes |> Enum.to_list() |> hd()]
+        roots -> roots
+      end
+
+    int_layers = Map.new(int_roots, &{&1, 0})
+
+    int_layers =
+      do_internal_propagate(int_layers, int_edges, MapSet.size(sg_nodes) * 2 + 1, true)
+
+    int_layers = Enum.reduce(sg_nodes, int_layers, fn nid, acc -> Map.put_new(acc, nid, 0) end)
+
+    size =
+      if map_size(int_layers) > 0 do
+        (int_layers |> Map.values() |> Enum.max()) + 1
+      else
+        0
+      end
+
+    {int_layers, size}
   end
 
   defp do_internal_propagate(layers, _edges, 0, _changed), do: layers
@@ -427,55 +442,61 @@ defmodule Boxart.Layout.Layers do
 
   defp do_internal_propagate(layers, edges, remaining, true) do
     {layers, changed} =
-      Enum.reduce(edges, {layers, false}, fn edge, {l, changed} ->
-        case Map.get(l, edge.source) do
-          nil ->
-            {l, changed}
-
-          src_layer ->
-            new_layer = src_layer + 1
-
-            if not Map.has_key?(l, edge.target) or l[edge.target] < new_layer do
-              {Map.put(l, edge.target, new_layer), true}
-            else
-              {l, changed}
-            end
-        end
-      end)
+      Enum.reduce(edges, {layers, false}, &propagate_internal_edge/2)
 
     do_internal_propagate(layers, edges, remaining - 1, changed)
+  end
+
+  defp propagate_internal_edge(edge, {layers, changed}) do
+    case Map.get(layers, edge.source) do
+      nil ->
+        {layers, changed}
+
+      src_layer ->
+        new_layer = src_layer + 1
+
+        if not Map.has_key?(layers, edge.target) or layers[edge.target] < new_layer do
+          {Map.put(layers, edge.target, new_layer), true}
+        else
+          {layers, changed}
+        end
+    end
   end
 
   defp count_crossings(graph, layer_lists) do
     layer_lists
     |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.reduce(0, fn [prev_layer, cur_layer], total ->
-      prev_pos = prev_layer |> Enum.with_index() |> Map.new()
-      cur_pos = cur_layer |> Enum.with_index() |> Map.new()
+    |> Enum.reduce(0, &count_layer_pair_crossings(graph, &1, &2))
+  end
 
-      edges_between =
-        graph.edges
-        |> Enum.flat_map(fn edge ->
-          with u when is_integer(u) <- Map.get(prev_pos, edge.source),
-               v when is_integer(v) <- Map.get(cur_pos, edge.target) do
-            [{u, v}]
-          else
-            _ -> []
-          end
-        end)
+  defp count_layer_pair_crossings(graph, [prev_layer, cur_layer], total) do
+    prev_pos = prev_layer |> Enum.with_index() |> Map.new()
+    cur_pos = cur_layer |> Enum.with_index() |> Map.new()
 
-      crossings =
-        for {pair1, i} <- Enum.with_index(edges_between),
-            {pair2, j} <- Enum.with_index(edges_between),
-            j > i,
-            {u1, v1} = pair1,
-            {u2, v2} = pair2,
-            (u1 - u2) * (v1 - v2) < 0,
-            reduce: 0 do
-          acc -> acc + 1
-        end
+    edges_between = collect_edges_between(graph, prev_pos, cur_pos)
 
-      total + crossings
+    crossings =
+      for {pair1, i} <- Enum.with_index(edges_between),
+          {pair2, j} <- Enum.with_index(edges_between),
+          j > i,
+          {u1, v1} = pair1,
+          {u2, v2} = pair2,
+          (u1 - u2) * (v1 - v2) < 0,
+          reduce: 0 do
+        acc -> acc + 1
+      end
+
+    total + crossings
+  end
+
+  defp collect_edges_between(graph, prev_pos, cur_pos) do
+    Enum.flat_map(graph.edges, fn edge ->
+      with u when is_integer(u) <- Map.get(prev_pos, edge.source),
+           v when is_integer(v) <- Map.get(cur_pos, edge.target) do
+        [{u, v}]
+      else
+        _ -> []
+      end
     end)
   end
 
@@ -491,42 +512,7 @@ defmodule Boxart.Layout.Layers do
   defp do_barycenter(_graph, _current, best, _best_crossings, 0, _no_imp), do: best
 
   defp do_barycenter(graph, current, best, best_crossings, passes_left, no_imp) do
-    current =
-      Enum.reduce(1..(length(current) - 1)//1, current, fn layer_idx, lists ->
-        prev_positions = lists |> Enum.at(layer_idx - 1) |> Enum.with_index() |> Map.new()
-        layer = Enum.at(lists, layer_idx)
-
-        barycenters =
-          layer
-          |> Enum.with_index()
-          |> Map.new(fn {nid, original_pos} ->
-            pred_positions =
-              graph.edges
-              |> Enum.flat_map(fn edge ->
-                if edge.target == nid do
-                  case Map.get(prev_positions, edge.source) do
-                    nil -> []
-                    pos -> [pos]
-                  end
-                else
-                  []
-                end
-              end)
-
-            bc =
-              if pred_positions != [] do
-                Enum.sum(pred_positions) / length(pred_positions)
-              else
-                original_pos * 1.0
-              end
-
-            {nid, bc}
-          end)
-
-        sorted = Enum.sort_by(layer, &Map.get(barycenters, &1, 0))
-        List.replace_at(lists, layer_idx, sorted)
-      end)
-
+    current = apply_barycenter_pass(graph, current)
     crossings = count_crossings(graph, current)
 
     if crossings < best_crossings do
@@ -536,27 +522,71 @@ defmodule Boxart.Layout.Layers do
     end
   end
 
-  defp enforce_topo_order_in_layers(graph, layer_lists, ortho_sets) do
-    Enum.map(layer_lists, fn layer ->
-      Enum.reduce(ortho_sets, layer, fn sg_nodes, layer_acc ->
-        in_layer = Enum.filter(layer_acc, &MapSet.member?(sg_nodes, &1))
+  defp apply_barycenter_pass(graph, layer_lists) do
+    Enum.reduce(1..(length(layer_lists) - 1)//1, layer_lists, fn layer_idx, lists ->
+      prev_positions = lists |> Enum.at(layer_idx - 1) |> Enum.with_index() |> Map.new()
+      layer = Enum.at(lists, layer_idx)
+      barycenters = compute_barycenters(graph, layer, prev_positions)
+      sorted = Enum.sort_by(layer, &Map.get(barycenters, &1, 0))
+      List.replace_at(lists, layer_idx, sorted)
+    end)
+  end
 
-        if length(in_layer) <= 1 do
-          layer_acc
+  defp compute_barycenters(graph, layer, prev_positions) do
+    layer
+    |> Enum.with_index()
+    |> Map.new(fn {nid, original_pos} ->
+      pred_positions = collect_predecessor_positions(graph, nid, prev_positions)
+
+      bc =
+        if pred_positions != [] do
+          Enum.sum(pred_positions) / length(pred_positions)
         else
-          topo = topo_sort_within(graph, MapSet.new(in_layer), in_layer)
-
-          positions =
-            layer_acc
-            |> Enum.with_index()
-            |> Enum.flat_map(fn {n, i} ->
-              if MapSet.member?(sg_nodes, n), do: [i], else: []
-            end)
-
-          Enum.zip(positions, topo)
-          |> Enum.reduce(layer_acc, fn {pos, nid}, acc -> List.replace_at(acc, pos, nid) end)
+          original_pos * 1.0
         end
-      end)
+
+      {nid, bc}
+    end)
+  end
+
+  defp collect_predecessor_positions(graph, nid, prev_positions) do
+    graph.edges
+    |> Enum.filter(&(&1.target == nid))
+    |> Enum.flat_map(fn edge ->
+      case Map.get(prev_positions, edge.source) do
+        nil -> []
+        pos -> [pos]
+      end
+    end)
+  end
+
+  defp enforce_topo_order_in_layers(graph, layer_lists, ortho_sets) do
+    Enum.map(layer_lists, &reorder_layer_for_topo(graph, &1, ortho_sets))
+  end
+
+  defp reorder_layer_for_topo(graph, layer, ortho_sets) do
+    Enum.reduce(ortho_sets, layer, &apply_topo_order_to_set(graph, &1, &2))
+  end
+
+  defp apply_topo_order_to_set(graph, sg_nodes, layer) do
+    in_layer = Enum.filter(layer, &MapSet.member?(sg_nodes, &1))
+
+    if length(in_layer) <= 1 do
+      layer
+    else
+      topo = topo_sort_within(graph, MapSet.new(in_layer), in_layer)
+      positions = collect_sg_positions(layer, sg_nodes)
+
+      Enum.zip(positions, topo)
+      |> Enum.reduce(layer, fn {pos, nid}, acc -> List.replace_at(acc, pos, nid) end)
+    end
+  end
+
+  defp collect_sg_positions(layer, sg_nodes) do
+    layer
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {n, i} ->
+      if MapSet.member?(sg_nodes, n), do: [i], else: []
     end)
   end
 

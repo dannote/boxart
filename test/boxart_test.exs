@@ -2,8 +2,7 @@ defmodule BoxartTest do
   use ExUnit.Case
 
   alias Boxart.Graph
-  alias Boxart.Graph.Node
-  alias Boxart.Graph.Edge
+  alias Boxart.Graph.{Edge, Node}
 
   test "render returns empty string for empty graph" do
     graph = %Graph{}

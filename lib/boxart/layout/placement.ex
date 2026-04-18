@@ -38,34 +38,7 @@ defmodule Boxart.Layout.Placement do
     {layout, _} =
       layer_order
       |> Enum.with_index()
-      |> Enum.reduce({layout, 0}, fn {nodes, layer_idx}, {layout_acc, cumulative_extra} ->
-        cumulative_extra =
-          if layer_idx > 0 do
-            cumulative_extra + Map.get(gap_expansions, layer_idx - 1, 0)
-          else
-            cumulative_extra
-          end
-
-        layout_acc =
-          nodes
-          |> Enum.with_index()
-          |> Enum.reduce(layout_acc, fn {nid, pos_idx}, l ->
-            {col, row} =
-              if horizontal do
-                {layer_idx * @stride + 1 + cumulative_extra, pos_idx * @stride + 1}
-              else
-                {pos_idx * @stride + 1, layer_idx * @stride + 1 + cumulative_extra}
-              end
-
-            gc = resolve_placement(l, %GridCoord{col: col, row: row}, horizontal)
-            placement = %NodePlacement{node_id: nid, grid: gc}
-
-            l = put_in(l.placements[nid], placement)
-            reserve_block(l, gc, nid)
-          end)
-
-        {layout_acc, cumulative_extra}
-      end)
+      |> Enum.reduce({layout, 0}, &place_layer(&1, &2, horizontal, gap_expansions))
 
     layout
   end
@@ -115,26 +88,61 @@ defmodule Boxart.Layout.Placement do
         if vertical, do: p.grid.row, else: p.grid.col
       end)
 
-    Enum.reduce(layer_groups, layout, fn {_layer_key, group}, l ->
-      if length(group) < 2 do
-        l
-      else
-        if vertical do
-          cols = Enum.map(group, fn {_nid, p} -> p.grid.col end) |> Enum.uniq()
-          max_w = cols |> Enum.map(&Map.get(l.col_widths, &1, 1)) |> Enum.max()
-          target = min(max_w, @max_normalized_width)
-          Enum.reduce(cols, l, fn c, acc -> ensure_col_width(acc, c, target) end)
-        else
-          rows = Enum.map(group, fn {_nid, p} -> p.grid.row end) |> Enum.uniq()
-          max_h = rows |> Enum.map(&Map.get(l.row_heights, &1, 1)) |> Enum.max()
-          target = min(max_h, @max_normalized_height)
-          Enum.reduce(rows, l, fn r, acc -> ensure_row_height(acc, r, target) end)
-        end
-      end
-    end)
+    Enum.reduce(layer_groups, layout, &normalize_layer_group(&1, &2, vertical))
   end
 
   # --- Private helpers ---
+
+  defp place_layer({nodes, layer_idx}, {layout_acc, cumulative_extra}, horizontal, gap_expansions) do
+    cumulative_extra =
+      if layer_idx > 0 do
+        cumulative_extra + Map.get(gap_expansions, layer_idx - 1, 0)
+      else
+        cumulative_extra
+      end
+
+    layout_acc =
+      nodes
+      |> Enum.with_index()
+      |> Enum.reduce(
+        layout_acc,
+        &place_single_node(&1, &2, layer_idx, cumulative_extra, horizontal)
+      )
+
+    {layout_acc, cumulative_extra}
+  end
+
+  defp place_single_node({nid, pos_idx}, layout, layer_idx, cumulative_extra, horizontal) do
+    {col, row} =
+      if horizontal do
+        {layer_idx * @stride + 1 + cumulative_extra, pos_idx * @stride + 1}
+      else
+        {pos_idx * @stride + 1, layer_idx * @stride + 1 + cumulative_extra}
+      end
+
+    gc = resolve_placement(layout, %GridCoord{col: col, row: row}, horizontal)
+    placement = %NodePlacement{node_id: nid, grid: gc}
+
+    layout = put_in(layout.placements[nid], placement)
+    reserve_block(layout, gc, nid)
+  end
+
+  defp normalize_layer_group({_layer_key, group}, layout, _vertical) when length(group) < 2,
+    do: layout
+
+  defp normalize_layer_group({_layer_key, group}, layout, vertical) do
+    if vertical do
+      cols = Enum.map(group, fn {_nid, p} -> p.grid.col end) |> Enum.uniq()
+      max_w = cols |> Enum.map(&Map.get(layout.col_widths, &1, 1)) |> Enum.max()
+      target = min(max_w, @max_normalized_width)
+      Enum.reduce(cols, layout, fn c, acc -> ensure_col_width(acc, c, target) end)
+    else
+      rows = Enum.map(group, fn {_nid, p} -> p.grid.row end) |> Enum.uniq()
+      max_h = rows |> Enum.map(&Map.get(layout.row_heights, &1, 1)) |> Enum.max()
+      target = min(max_h, @max_normalized_height)
+      Enum.reduce(rows, layout, fn r, acc -> ensure_row_height(acc, r, target) end)
+    end
+  end
 
   defp resolve_placement(layout, gc, horizontal) do
     if can_place?(layout, gc) do
@@ -158,7 +166,7 @@ defmodule Boxart.Layout.Placement do
   defp can_place?(layout, gc) do
     Enum.all?(-1..1, fn dc ->
       Enum.all?(-1..1, fn dr ->
-        Layout.is_free(layout, gc.col + dc, gc.row + dr, nil)
+        Layout.free?(layout, gc.col + dc, gc.row + dr, nil)
       end)
     end)
   end
@@ -279,42 +287,45 @@ defmodule Boxart.Layout.Placement do
     if src_p == nil or tgt_p == nil do
       layout
     else
-      if horizontal do
-        c1 = min(src_p.grid.col, tgt_p.grid.col)
-        c2 = max(src_p.grid.col, tgt_p.grid.col)
-        gap_start = c1 + 2
-        gap_end = c2 - 2
-
-        if gap_start > gap_end do
-          layout
-        else
-          needed = label_len + 1
-          ensure_col_width(layout, gap_start, needed)
-        end
-      else
-        r1 = min(src_p.grid.row, tgt_p.grid.row)
-        r2 = max(src_p.grid.row, tgt_p.grid.row)
-        gap_start = r1 + 2
-        gap_end = r2 - 2
-
-        layout =
-          if gap_start <= gap_end do
-            ensure_row_height(layout, gap_start, 3)
-          else
-            layout
-          end
-
-        gap_cols = compute_label_gap_cols(src_p, tgt_p)
-
-        Enum.reduce(gap_cols, layout, fn gap_col, l ->
-          if gap_col >= 0 and Map.has_key?(l.col_widths, gap_col) do
-            ensure_col_width(l, gap_col, label_len + 1)
-          else
-            l
-          end
-        end)
-      end
+      do_expand_label_gap(layout, src_p, tgt_p, label_len, horizontal)
     end
+  end
+
+  defp do_expand_label_gap(layout, src_p, tgt_p, label_len, true = _horizontal) do
+    c1 = min(src_p.grid.col, tgt_p.grid.col)
+    c2 = max(src_p.grid.col, tgt_p.grid.col)
+    gap_start = c1 + 2
+    gap_end = c2 - 2
+
+    if gap_start > gap_end do
+      layout
+    else
+      ensure_col_width(layout, gap_start, label_len + 1)
+    end
+  end
+
+  defp do_expand_label_gap(layout, src_p, tgt_p, label_len, false = _horizontal) do
+    r1 = min(src_p.grid.row, tgt_p.grid.row)
+    r2 = max(src_p.grid.row, tgt_p.grid.row)
+    gap_start = r1 + 2
+    gap_end = r2 - 2
+
+    layout =
+      if gap_start <= gap_end do
+        ensure_row_height(layout, gap_start, 3)
+      else
+        layout
+      end
+
+    gap_cols = compute_label_gap_cols(src_p, tgt_p)
+
+    Enum.reduce(gap_cols, layout, fn gap_col, l ->
+      if gap_col >= 0 and Map.has_key?(l.col_widths, gap_col) do
+        ensure_col_width(l, gap_col, label_len + 1)
+      else
+        l
+      end
+    end)
   end
 
   defp compute_label_gap_cols(src_p, tgt_p) do
@@ -372,16 +383,16 @@ defmodule Boxart.Layout.Placement do
         [text]
 
       [first | rest] ->
-        {lines, current} =
-          Enum.reduce(rest, {[], first}, fn word, {lines, current} ->
-            if display_width(current) + 1 + display_width(word) <= max_width do
-              {lines, current <> " " <> word}
-            else
-              {[current | lines], word}
-            end
-          end)
-
+        {lines, current} = Enum.reduce(rest, {[], first}, &wrap_word(&1, &2, max_width))
         Enum.reverse([current | lines])
+    end
+  end
+
+  defp wrap_word(word, {lines, current}, max_width) do
+    if display_width(current) + 1 + display_width(word) <= max_width do
+      {lines, current <> " " <> word}
+    else
+      {[current | lines], word}
     end
   end
 

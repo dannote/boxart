@@ -2,7 +2,7 @@ defmodule Boxart.RenderTest do
   use ExUnit.Case, async: true
 
   alias Boxart.Graph
-  alias Boxart.Graph.{Node, Edge}
+  alias Boxart.Graph.{Edge, Node}
 
   defp graph(direction, edges, node_overrides \\ %{}) do
     node_ids = edges |> Enum.flat_map(fn e -> [e.source, e.target] end) |> Enum.uniq()

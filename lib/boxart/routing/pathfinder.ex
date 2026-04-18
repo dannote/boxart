@@ -8,7 +8,13 @@ defmodule Boxart.Routing.Pathfinder do
   """
 
   @type coord :: {col :: integer(), row :: integer()}
-  @type is_free_fn :: (integer(), integer() -> boolean())
+  @type free_fn :: (integer(), integer() -> boolean())
+
+  defmodule SearchState do
+    @moduledoc false
+    @type t :: %__MODULE__{}
+    defstruct [:end_col, :end_row, :free_fn, :soft, :max_iterations]
+  end
 
   @dirs [{0, -1}, {0, 1}, {-1, 0}, {1, 0}]
 
@@ -38,14 +44,19 @@ defmodule Boxart.Routing.Pathfinder do
 
   Returns a list of `{col, row}` waypoints, or `nil` if no path found.
   """
-  @spec find_path(integer(), integer(), integer(), integer(), is_free_fn(), keyword()) ::
+  @spec find_path(integer(), integer(), integer(), integer(), free_fn(), keyword()) ::
           [coord()] | nil
-  def find_path(start_col, start_row, end_col, end_row, is_free, opts \\ []) do
+  def find_path(start_col, start_row, end_col, end_row, free_fn, opts \\ []) do
     if start_col == end_col and start_row == end_row do
       [{start_col, start_row}]
     else
-      soft = Keyword.get(opts, :soft_obstacles, MapSet.new())
-      max_iterations = Keyword.get(opts, :max_iterations, 5000)
+      state = %SearchState{
+        end_col: end_col,
+        end_row: end_row,
+        free_fn: free_fn,
+        soft: Keyword.get(opts, :soft_obstacles, MapSet.new()),
+        max_iterations: Keyword.get(opts, :max_iterations, 5000)
+      }
 
       start_node = %{
         f_cost: heuristic(start_col, start_row, end_col, end_row),
@@ -57,57 +68,35 @@ defmodule Boxart.Routing.Pathfinder do
 
       initial_best_g = %{{start_col, start_row} => 0.0}
 
-      do_find_path(
-        [start_node],
-        MapSet.new(),
-        initial_best_g,
-        end_col,
-        end_row,
-        is_free,
-        soft,
-        max_iterations,
-        0
-      )
+      do_find_path([start_node], MapSet.new(), initial_best_g, state, 0)
     end
   end
 
-  defp do_find_path([], _closed, _best_g, _ec, _er, _is_free, _soft, _max, _iter), do: nil
+  defp do_find_path([], _closed, _best_g, _state, _iter), do: nil
 
-  defp do_find_path(_open, _closed, _best_g, _ec, _er, _is_free, _soft, max, iter)
+  defp do_find_path(_open, _closed, _best_g, %{max_iterations: max}, iter)
        when iter >= max,
        do: nil
 
-  defp do_find_path(open, closed, best_g, end_col, end_row, is_free, soft, max, iter) do
+  defp do_find_path(open, closed, best_g, state, iter) do
     {current, rest} = pop_min(open)
     key = {current.col, current.row}
 
-    if current.col == end_col and current.row == end_row do
-      reconstruct(current)
-    else
-      if MapSet.member?(closed, key) do
-        do_find_path(rest, closed, best_g, end_col, end_row, is_free, soft, max, iter + 1)
-      else
+    cond do
+      current.col == state.end_col and current.row == state.end_row ->
+        reconstruct(current)
+
+      MapSet.member?(closed, key) ->
+        do_find_path(rest, closed, best_g, state, iter + 1)
+
+      true ->
         closed = MapSet.put(closed, key)
-
-        {new_open, new_best_g} =
-          expand_neighbors(current, rest, closed, best_g, end_col, end_row, is_free, soft)
-
-        do_find_path(
-          new_open,
-          closed,
-          new_best_g,
-          end_col,
-          end_row,
-          is_free,
-          soft,
-          max,
-          iter + 1
-        )
-      end
+        {new_open, new_best_g} = expand_neighbors(current, rest, closed, best_g, state)
+        do_find_path(new_open, closed, new_best_g, state, iter + 1)
     end
   end
 
-  defp expand_neighbors(current, open, closed, best_g, end_col, end_row, is_free, soft) do
+  defp expand_neighbors(current, open, closed, best_g, state) do
     Enum.reduce(@dirs, {open, best_g}, fn {dc, dr}, {acc_open, acc_best} ->
       nc = current.col + dc
       nr = current.row + dr
@@ -117,30 +106,39 @@ defmodule Boxart.Routing.Pathfinder do
         MapSet.member?(closed, nkey) ->
           {acc_open, acc_best}
 
-        nkey != {end_col, end_row} and not is_free.(nc, nr) ->
+        not neighbor_passable?(nkey, state) ->
           {acc_open, acc_best}
 
         true ->
-          step_cost = base_step_cost(nkey, soft) + corner_penalty(current, dc, dr)
-          new_g = current.g_cost + step_cost
-
-          if Map.get(acc_best, nkey, :infinity) <= new_g do
-            {acc_open, acc_best}
-          else
-            h = heuristic(nc, nr, end_col, end_row)
-
-            neighbor = %{
-              f_cost: new_g + h,
-              g_cost: new_g,
-              col: nc,
-              row: nr,
-              parent: current
-            }
-
-            {insert_sorted(acc_open, neighbor), Map.put(acc_best, nkey, new_g)}
-          end
+          maybe_add_neighbor(current, nc, nr, dc, dr, acc_open, acc_best, state)
       end
     end)
+  end
+
+  defp neighbor_passable?({nc, nr} = nkey, state) do
+    nkey == {state.end_col, state.end_row} or state.free_fn.(nc, nr)
+  end
+
+  defp maybe_add_neighbor(current, nc, nr, dc, dr, open, best_g, state) do
+    nkey = {nc, nr}
+    step_cost = base_step_cost(nkey, state.soft) + corner_penalty(current, dc, dr)
+    new_g = current.g_cost + step_cost
+
+    if Map.get(best_g, nkey, :infinity) <= new_g do
+      {open, best_g}
+    else
+      h = heuristic(nc, nr, state.end_col, state.end_row)
+
+      neighbor = %{
+        f_cost: new_g + h,
+        g_cost: new_g,
+        col: nc,
+        row: nr,
+        parent: current
+      }
+
+      {insert_sorted(open, neighbor), Map.put(best_g, nkey, new_g)}
+    end
   end
 
   defp base_step_cost(coord, soft) do

@@ -2,7 +2,7 @@ defmodule Boxart.RoutingTest do
   use ExUnit.Case, async: true
 
   alias Boxart.Graph
-  alias Boxart.Graph.{Node, Edge}
+  alias Boxart.Graph.{Edge, Node}
   alias Boxart.Layout
   alias Boxart.Routing
   alias Boxart.Routing.Pathfinder

@@ -118,33 +118,37 @@ defmodule Boxart.Routing do
 
   defp resolve_placement(sg_id, true, layout, sg_bounds) do
     case Map.get(sg_bounds, sg_id) do
-      nil ->
-        nil
-
-      sb ->
-        cx = sb.x + div(sb.width, 2)
-        cy = sb.y + div(sb.height, 2)
-
-        {best_col, best_row} =
-          layout.placements
-          |> Map.values()
-          |> Enum.reduce({0, 0, :infinity}, fn p, {bc, br, bd} ->
-            dx = p.draw_x + div(p.draw_width, 2) - cx
-            dy = p.draw_y + div(p.draw_height, 2) - cy
-            dist = abs(dx) + abs(dy)
-            if dist < bd, do: {p.grid.col, p.grid.row, dist}, else: {bc, br, bd}
-          end)
-          |> then(fn {c, r, _} -> {c, r} end)
-
-        %{
-          node_id: sg_id,
-          grid: %{col: best_col, row: best_row},
-          draw_x: sb.x,
-          draw_y: sb.y,
-          draw_width: sb.width,
-          draw_height: sb.height
-        }
+      nil -> nil
+      sb -> build_subgraph_placement(sg_id, sb, layout)
     end
+  end
+
+  defp build_subgraph_placement(sg_id, sb, layout) do
+    cx = sb.x + div(sb.width, 2)
+    cy = sb.y + div(sb.height, 2)
+
+    {best_col, best_row} = find_nearest_grid_cell(layout.placements, cx, cy)
+
+    %{
+      node_id: sg_id,
+      grid: %{col: best_col, row: best_row},
+      draw_x: sb.x,
+      draw_y: sb.y,
+      draw_width: sb.width,
+      draw_height: sb.height
+    }
+  end
+
+  defp find_nearest_grid_cell(placements, cx, cy) do
+    placements
+    |> Map.values()
+    |> Enum.reduce({0, 0, :infinity}, fn p, {bc, br, bd} ->
+      dx = p.draw_x + div(p.draw_width, 2) - cx
+      dy = p.draw_y + div(p.draw_height, 2) - cy
+      dist = abs(dx) + abs(dy)
+      if dist < bd, do: {p.grid.col, p.grid.row, dist}, else: {bc, br, bd}
+    end)
+    |> then(fn {c, r, _} -> {c, r} end)
   end
 
   # --- Attachment points ---
@@ -222,7 +226,7 @@ defmodule Boxart.Routing do
 
   defp route_edge(edge, src, tgt, layout, direction, soft_obstacles) do
     {preferred, alt} = determine_directions(src, tgt, direction)
-    is_free = fn c, r -> layout_is_free(layout, c, r) end
+    free? = fn c, r -> layout_free?(layout, c, r) end
 
     {start_pref_col, start_pref_row} = get_attach_point(src, elem(preferred, 0))
     {end_pref_col, end_pref_row} = get_attach_point(tgt, elem(preferred, 1))
@@ -233,7 +237,7 @@ defmodule Boxart.Routing do
         start_pref_row,
         end_pref_col,
         end_pref_row,
-        is_free,
+        free?,
         soft_obstacles: soft_obstacles
       )
 
@@ -246,7 +250,7 @@ defmodule Boxart.Routing do
         start_alt_row,
         end_alt_col,
         end_alt_row,
-        is_free,
+        free?,
         soft_obstacles: soft_obstacles
       )
 
@@ -323,39 +327,41 @@ defmodule Boxart.Routing do
       |> Enum.group_by(&List.last(&1.draw_path))
 
     Enum.reduce(end_groups, routed, fn {_point, edges}, acc ->
-      if length(edges) <= 1 do
-        acc
-      else
-        tgt_id = edges |> hd() |> Map.get(:edge) |> Map.get(:target)
+      spread_group(acc, edges, layout)
+    end)
+  end
 
-        case Map.get(layout.placements, tgt_id) do
-          nil -> acc
-          placement -> apply_spread(acc, edges, List.last(hd(edges).draw_path), placement)
-        end
+  defp spread_group(routed, edges, _layout) when length(edges) <= 1, do: routed
+
+  defp spread_group(routed, edges, layout) do
+    tgt_id = edges |> hd() |> Map.get(:edge) |> Map.get(:target)
+
+    case Map.get(layout.placements, tgt_id) do
+      nil -> routed
+      placement -> apply_spread(routed, edges, List.last(hd(edges).draw_path), placement)
+    end
+  end
+
+  defp apply_spread(all_routed, edges, endpoint, placement) do
+    n = length(edges)
+    attach = hd(edges).end_dir
+
+    case compute_offsets(attach, n, endpoint, placement, edges) do
+      nil -> all_routed
+      offset_map -> apply_offset_map(all_routed, offset_map)
+    end
+  end
+
+  defp apply_offset_map(routed, offset_map) do
+    Enum.map(routed, fn re ->
+      case Map.get(offset_map, re.index) do
+        nil -> re
+        updater -> updater.(re)
       end
     end)
   end
 
-  defp apply_spread(all_routed, edges, {px, py}, placement) do
-    n = length(edges)
-    attach = hd(edges).end_dir
-    offsets = compute_offsets(attach, n, px, py, placement, edges)
-
-    case offsets do
-      nil ->
-        all_routed
-
-      offset_map ->
-        Enum.map(all_routed, fn re ->
-          case Map.get(offset_map, re.index) do
-            nil -> re
-            updater -> updater.(re)
-          end
-        end)
-    end
-  end
-
-  defp compute_offsets(attach, n, px, py, placement, edges) when attach in [:top, :bottom] do
+  defp compute_offsets(attach, n, {px, py}, placement, edges) when attach in [:top, :bottom] do
     min_x = placement.draw_x + 1
     max_x = placement.draw_x + placement.draw_width - 2
     spread_range = max_x - min_x
@@ -364,29 +370,11 @@ defmodule Boxart.Routing do
       nil
     else
       step = min(2, div(spread_range, max(n - 1, 1)))
-
-      edges
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {re, i}, acc ->
-        offset = trunc((i - (n - 1) / 2) * step)
-
-        if offset == 0 do
-          acc
-        else
-          new_x = max(min_x, min(max_x, px + offset))
-
-          Map.put(acc, re.index, fn re ->
-            {_adj_x, adj_y} = Enum.at(re.draw_path, -2)
-            draw_path = List.replace_at(re.draw_path, -1, {new_x, py})
-            draw_path = List.replace_at(draw_path, -2, {new_x, adj_y})
-            %{re | draw_path: draw_path}
-          end)
-        end
-      end)
+      build_horizontal_offsets(edges, n, step, px, py, min_x, max_x)
     end
   end
 
-  defp compute_offsets(attach, n, px, py, placement, edges) when attach in [:left, :right] do
+  defp compute_offsets(attach, n, {px, py}, placement, edges) when attach in [:left, :right] do
     min_y = placement.draw_y + 1
     max_y = placement.draw_y + placement.draw_height - 2
     spread_range = max_y - min_y
@@ -398,31 +386,53 @@ defmodule Boxart.Routing do
       nil
     else
       step = min(2, div(spread_range, max(n - 1, 1)))
-
-      edges
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {re, i}, acc ->
-        offset = trunc((i - (n - 1) / 2) * step)
-
-        if offset == 0 do
-          acc
-        else
-          new_y = max(min_y, min(max_y, py + offset))
-
-          Map.put(acc, re.index, fn re ->
-            {adj_x, _adj_y} = Enum.at(re.draw_path, -2)
-            draw_path = List.replace_at(re.draw_path, -1, {px, new_y})
-            draw_path = List.insert_at(draw_path, -1, {adj_x, new_y})
-            %{re | draw_path: draw_path}
-          end)
-        end
-      end)
+      build_vertical_offsets(edges, n, step, px, py, min_y, max_y)
     end
+  end
+
+  defp build_horizontal_offsets(edges, n, step, px, py, min_x, max_x) do
+    edges
+    |> Enum.with_index()
+    |> Enum.reduce(%{}, fn {re, i}, acc ->
+      offset = trunc((i - (n - 1) / 2) * step)
+      if offset == 0, do: acc, else: put_h_offset(acc, re.index, px + offset, py, min_x, max_x)
+    end)
+  end
+
+  defp put_h_offset(acc, index, target_x, py, min_x, max_x) do
+    new_x = max(min_x, min(max_x, target_x))
+
+    Map.put(acc, index, fn re ->
+      {_adj_x, adj_y} = Enum.at(re.draw_path, -2)
+      draw_path = List.replace_at(re.draw_path, -1, {new_x, py})
+      draw_path = List.replace_at(draw_path, -2, {new_x, adj_y})
+      %{re | draw_path: draw_path}
+    end)
+  end
+
+  defp build_vertical_offsets(edges, n, step, px, py, min_y, max_y) do
+    edges
+    |> Enum.with_index()
+    |> Enum.reduce(%{}, fn {re, i}, acc ->
+      offset = trunc((i - (n - 1) / 2) * step)
+      if offset == 0, do: acc, else: put_v_offset(acc, re.index, px, py + offset, min_y, max_y)
+    end)
+  end
+
+  defp put_v_offset(acc, index, px, target_y, min_y, max_y) do
+    new_y = max(min_y, min(max_y, target_y))
+
+    Map.put(acc, index, fn re ->
+      {adj_x, _adj_y} = Enum.at(re.draw_path, -2)
+      draw_path = List.replace_at(re.draw_path, -1, {px, new_y})
+      draw_path = List.insert_at(draw_path, -1, {adj_x, new_y})
+      %{re | draw_path: draw_path}
+    end)
   end
 
   # --- Layout delegation ---
 
-  defp layout_is_free(%{grid_occupied: occupied}, col, row) do
+  defp layout_free?(%{grid_occupied: occupied}, col, row) do
     col >= 0 and row >= 0 and not Map.has_key?(occupied, {col, row})
   end
 

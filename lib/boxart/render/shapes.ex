@@ -120,18 +120,10 @@ defmodule Boxart.Render.Shapes do
         ) ::
           Canvas.t()
   def draw_rectangle(canvas, x, y, width, height, label, cs) do
+    corners = {cs.box.top_left, cs.box.top_right, cs.box.bottom_left, cs.box.bottom_right}
+
     canvas
-    |> draw_box_border(
-      x,
-      y,
-      width,
-      height,
-      cs.top_left,
-      cs.top_right,
-      cs.bottom_left,
-      cs.bottom_right,
-      cs
-    )
+    |> draw_box_border(x, y, width, height, corners, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -153,18 +145,12 @@ defmodule Boxart.Render.Shapes do
         ) ::
           Canvas.t()
   def draw_rounded(canvas, x, y, width, height, label, cs) do
+    corners =
+      {cs.box.round_top_left, cs.box.round_top_right, cs.box.round_bottom_left,
+       cs.box.round_bottom_right}
+
     canvas
-    |> draw_box_border(
-      x,
-      y,
-      width,
-      height,
-      cs.round_top_left,
-      cs.round_top_right,
-      cs.round_bottom_left,
-      cs.round_bottom_right,
-      cs
-    )
+    |> draw_box_border(x, y, width, height, corners, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -187,8 +173,16 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_stadium(canvas, x, y, width, height, label, cs) do
     canvas
-    |> draw_top_border(x, y, width, cs.round_top_left, cs.round_top_right, cs)
-    |> draw_bottom_border(x, y, width, height, cs.round_bottom_left, cs.round_bottom_right, cs)
+    |> draw_top_border(x, y, width, cs.box.round_top_left, cs.box.round_top_right, cs)
+    |> draw_bottom_border(
+      x,
+      y,
+      width,
+      height,
+      cs.box.round_bottom_left,
+      cs.box.round_bottom_right,
+      cs
+    )
     |> draw_sides(x, y, width, height, "(", ")")
     |> draw_label(x, y, width, height, label)
   end
@@ -216,8 +210,8 @@ defmodule Boxart.Render.Shapes do
     if width > 4 do
       Enum.reduce((y + 1)..(y + height - 2)//1, canvas, fn r, acc ->
         acc
-        |> Canvas.put(x + 1, r, cs.vertical)
-        |> Canvas.put(x + width - 2, r, cs.vertical)
+        |> Canvas.put(x + 1, r, cs.box.vertical)
+        |> Canvas.put(x + width - 2, r, cs.box.vertical)
       end)
     else
       canvas
@@ -243,20 +237,12 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_diamond(canvas, x, y, width, height, label, cs) do
     cx = x + div(width, 2)
-    marker = if cs.horizontal == "─", do: "◇", else: "*"
+    marker = if cs.box.horizontal == "─", do: "◇", else: "*"
+
+    corners = {cs.box.top_left, cs.box.top_right, cs.box.bottom_left, cs.box.bottom_right}
 
     canvas
-    |> draw_box_border(
-      x,
-      y,
-      width,
-      height,
-      cs.top_left,
-      cs.top_right,
-      cs.bottom_left,
-      cs.bottom_right,
-      cs
-    )
+    |> draw_box_border(x, y, width, height, corners, cs)
     |> Canvas.put(cx, y, marker, merge: false)
     |> Canvas.put(cx, y + height - 1, marker, merge: false)
     |> draw_label(x, y, width, height, label)
@@ -280,14 +266,14 @@ defmodule Boxart.Render.Shapes do
         ) ::
           Canvas.t()
   def draw_hexagon(canvas, x, y, width, height, label, cs) do
-    side_char = if cs.horizontal == "─", do: cs.vertical, else: "|"
+    side_char = if cs.box.horizontal == "─", do: cs.box.vertical, else: "|"
 
     canvas
     |> Canvas.put(x + 1, y, "/")
-    |> fill_horizontal(y, x + 2, x + width - 2, cs.horizontal)
+    |> fill_horizontal(y, x + 2, x + width - 2, cs.box.horizontal)
     |> Canvas.put(x + width - 2, y, "\\")
     |> Canvas.put(x + 1, y + height - 1, "\\")
-    |> fill_horizontal(y + height - 1, x + 2, x + width - 2, cs.horizontal)
+    |> fill_horizontal(y + height - 1, x + 2, x + width - 2, cs.box.horizontal)
     |> Canvas.put(x + width - 2, y + height - 1, "/")
     |> draw_sides(x, y, width, height, side_char, side_char)
     |> draw_label(x, y, width, height, label)
@@ -312,7 +298,7 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_circle(canvas, x, y, width, height, label, cs) do
     cx = x + div(width, 2)
-    marker = if cs.horizontal == "─", do: "◯", else: "O"
+    marker = if cs.box.horizontal == "─", do: "◯", else: "O"
 
     canvas
     |> draw_rounded(x, y, width, height, label, cs)
@@ -338,12 +324,12 @@ defmodule Boxart.Render.Shapes do
 
     if width > 4 and height > 2 do
       canvas
-      |> Canvas.put(x + 1, y + 1, cs.round_top_left)
-      |> fill_horizontal(y + 1, x + 2, x + width - 2, cs.horizontal)
-      |> Canvas.put(x + width - 2, y + 1, cs.round_top_right)
-      |> Canvas.put(x + 1, y + height - 2, cs.round_bottom_left)
-      |> fill_horizontal(y + height - 2, x + 2, x + width - 2, cs.horizontal)
-      |> Canvas.put(x + width - 2, y + height - 2, cs.round_bottom_right)
+      |> Canvas.put(x + 1, y + 1, cs.box.round_top_left)
+      |> fill_horizontal(y + 1, x + 2, x + width - 2, cs.box.horizontal)
+      |> Canvas.put(x + width - 2, y + 1, cs.box.round_top_right)
+      |> Canvas.put(x + 1, y + height - 2, cs.box.round_bottom_left)
+      |> fill_horizontal(y + height - 2, x + 2, x + width - 2, cs.box.horizontal)
+      |> Canvas.put(x + width - 2, y + height - 2, cs.box.round_bottom_right)
     else
       canvas
     end
@@ -378,11 +364,11 @@ defmodule Boxart.Render.Shapes do
       end)
 
     canvas
-    |> Canvas.put(x + width - 1, y, cs.top_right)
-    |> Canvas.put(x + width - 1, y + height - 1, cs.bottom_right)
-    |> draw_right_side(x, y, width, height, cs.vertical)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.horizontal)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.horizontal)
+    |> Canvas.put(x + width - 1, y, cs.box.top_right)
+    |> Canvas.put(x + width - 1, y + height - 1, cs.box.bottom_right)
+    |> draw_right_side(x, y, width, height, cs.box.vertical)
+    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -407,19 +393,19 @@ defmodule Boxart.Render.Shapes do
   def draw_cylinder(canvas, x, y, width, height, label, cs) do
     canvas
     # Top ellipse
-    |> Canvas.put(x, y, cs.round_top_left)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.horizontal)
-    |> Canvas.put(x + width - 1, y, cs.round_top_right)
+    |> Canvas.put(x, y, cs.box.round_top_left)
+    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.put(x + width - 1, y, cs.box.round_top_right)
     # Second row (bottom of top ellipse)
-    |> Canvas.put(x, y + 1, cs.round_bottom_left)
-    |> fill_horizontal(y + 1, x + 1, x + width - 1, cs.horizontal)
-    |> Canvas.put(x + width - 1, y + 1, cs.round_bottom_right)
+    |> Canvas.put(x, y + 1, cs.box.round_bottom_left)
+    |> fill_horizontal(y + 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.put(x + width - 1, y + 1, cs.box.round_bottom_right)
     # Body sides
-    |> draw_sides_range(x, width, y + 2, y + height - 1, cs.vertical)
+    |> draw_sides_range(x, width, y + 2, y + height - 1, cs.box.vertical)
     # Bottom ellipse
-    |> Canvas.put(x, y + height - 1, cs.round_bottom_left)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.horizontal)
-    |> Canvas.put(x + width - 1, y + height - 1, cs.round_bottom_right)
+    |> Canvas.put(x, y + height - 1, cs.box.round_bottom_left)
+    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.put(x + width - 1, y + height - 1, cs.box.round_bottom_right)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -438,7 +424,7 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_trapezoid(canvas, x, y, width, height, label, cs) do
     canvas
-    |> draw_slanted_box(x, y, width, height, "/", "\\", "\\", "/", cs)
+    |> draw_slanted_box(x, y, width, height, {"/", "\\", "\\", "/"}, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -457,7 +443,7 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_trapezoid_alt(canvas, x, y, width, height, label, cs) do
     canvas
-    |> draw_slanted_box(x, y, width, height, "\\", "/", "/", "\\", cs)
+    |> draw_slanted_box(x, y, width, height, {"\\", "/", "/", "\\"}, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -476,7 +462,7 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_parallelogram(canvas, x, y, width, height, label, cs) do
     canvas
-    |> draw_slanted_box(x, y, width, height, "/", "/", "/", "/", cs)
+    |> draw_slanted_box(x, y, width, height, {"/", "/", "/", "/"}, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -495,7 +481,7 @@ defmodule Boxart.Render.Shapes do
           Canvas.t()
   def draw_parallelogram_alt(canvas, x, y, width, height, label, cs) do
     canvas
-    |> draw_slanted_box(x, y, width, height, "\\", "\\", "\\", "\\", cs)
+    |> draw_slanted_box(x, y, width, height, {"\\", "\\", "\\", "\\"}, cs)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -515,7 +501,7 @@ defmodule Boxart.Render.Shapes do
   def draw_start_state(canvas, x, y, width, height, _label, cs) do
     cy = y + div(height, 2)
     cx = x + div(width, 2)
-    marker = if cs.horizontal == "─", do: "●", else: "*"
+    marker = if cs.box.horizontal == "─", do: "●", else: "*"
     Canvas.put(canvas, cx, cy, marker)
   end
 
@@ -535,7 +521,7 @@ defmodule Boxart.Render.Shapes do
   def draw_end_state(canvas, x, y, width, height, _label, cs) do
     cy = y + div(height, 2)
     cx = x + div(width, 2)
-    marker = if cs.horizontal == "─", do: "◉", else: "@"
+    marker = if cs.box.horizontal == "─", do: "◉", else: "@"
     Canvas.put(canvas, cx, cy, marker)
   end
 
@@ -553,7 +539,7 @@ defmodule Boxart.Render.Shapes do
         ) ::
           Canvas.t()
   def draw_fork_join(canvas, x, y, width, height, _label, cs) do
-    bar_char = if cs.horizontal == "─", do: "━", else: "="
+    bar_char = if cs.box.horizontal == "─", do: "━", else: "="
 
     for r <- y..(y + height - 1)//1,
         c <- x..(x + width - 1)//1,
@@ -566,24 +552,24 @@ defmodule Boxart.Render.Shapes do
 
   # Canvas.put(canvas, col, row, ch) — col=x, row=y
 
-  defp draw_box_border(canvas, x, y, width, height, tl, tr, bl, br, cs) do
+  defp draw_box_border(canvas, x, y, width, height, {tl, tr, bl, br}, cs) do
     canvas
     |> draw_top_border(x, y, width, tl, tr, cs)
     |> draw_bottom_border(x, y, width, height, bl, br, cs)
-    |> draw_sides(x, y, width, height, cs.vertical, cs.vertical)
+    |> draw_sides(x, y, width, height, cs.box.vertical, cs.box.vertical)
   end
 
   defp draw_top_border(canvas, x, y, width, left_corner, right_corner, cs) do
     canvas
     |> Canvas.put(x, y, left_corner)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.horizontal)
+    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y, right_corner)
   end
 
   defp draw_bottom_border(canvas, x, y, width, height, left_corner, right_corner, cs) do
     canvas
     |> Canvas.put(x, y + height - 1, left_corner)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.horizontal)
+    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + height - 1, right_corner)
   end
 
@@ -617,15 +603,15 @@ defmodule Boxart.Render.Shapes do
     end)
   end
 
-  defp draw_slanted_box(canvas, x, y, width, height, tl, tr, bl, br, cs) do
+  defp draw_slanted_box(canvas, x, y, width, height, {tl, tr, bl, br}, cs) do
     canvas
     |> Canvas.put(x, y, tl)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.horizontal)
+    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y, tr)
     |> Canvas.put(x, y + height - 1, bl)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.horizontal)
+    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + height - 1, br)
-    |> draw_sides(x, y, width, height, cs.vertical, cs.vertical)
+    |> draw_sides(x, y, width, height, cs.box.vertical, cs.box.vertical)
   end
 
   defp draw_label(canvas, x, y, width, height, label) do

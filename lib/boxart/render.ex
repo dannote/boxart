@@ -120,15 +120,15 @@ defmodule Boxart.Render do
 
     canvas
     # Top border
-    |> Canvas.put(x, y, cs.sg_top_left)
-    |> fill_horizontal(y, x + 1, x + w - 1, cs.sg_horizontal)
-    |> Canvas.put(x + w - 1, y, cs.sg_top_right)
+    |> Canvas.put(x, y, cs.subgraph.top_left)
+    |> fill_horizontal(y, x + 1, x + w - 1, cs.subgraph.horizontal)
+    |> Canvas.put(x + w - 1, y, cs.subgraph.top_right)
     # Bottom border
-    |> Canvas.put(x, y + h - 1, cs.sg_bottom_left)
-    |> fill_horizontal(y + h - 1, x + 1, x + w - 1, cs.sg_horizontal)
-    |> Canvas.put(x + w - 1, y + h - 1, cs.sg_bottom_right)
+    |> Canvas.put(x, y + h - 1, cs.subgraph.bottom_left)
+    |> fill_horizontal(y + h - 1, x + 1, x + w - 1, cs.subgraph.horizontal)
+    |> Canvas.put(x + w - 1, y + h - 1, cs.subgraph.bottom_right)
     # Side borders
-    |> fill_vertical_both(x, x + w - 1, y + 1, y + h - 1, cs.sg_vertical)
+    |> fill_vertical_both(x, x + w - 1, y + 1, y + h - 1, cs.subgraph.vertical)
   end
 
   # -- Subgraph labels --
@@ -251,34 +251,40 @@ defmodule Boxart.Render do
 
   # -- Edge line drawing --
 
-  defp edge_line_chars(:dotted, cs), do: {cs.line_dotted_h, cs.line_dotted_v}
-  defp edge_line_chars(:thick, cs), do: {cs.line_thick_h, cs.line_thick_v}
+  defp edge_line_chars(:dotted, cs), do: {cs.lines.dotted_h, cs.lines.dotted_v}
+  defp edge_line_chars(:thick, cs), do: {cs.lines.thick_h, cs.lines.thick_v}
   defp edge_line_chars(:invisible, _cs), do: {" ", " "}
-  defp edge_line_chars(_solid, cs), do: {cs.line_horizontal, cs.line_vertical}
+  defp edge_line_chars(_solid, cs), do: {cs.lines.horizontal, cs.lines.vertical}
 
   defp draw_edge_segments(canvas, path, edge, h_char, v_char) do
+    chars = {h_char, v_char}
+
     path
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.with_index()
     |> Enum.reduce(canvas, fn {[{x1, y1}, {x2, y2}], i}, acc ->
-      draw_clipped_segment(acc, x1, y1, x2, y2, i, edge, h_char, v_char)
+      {sx, sy, ex, ey} = clip_segment({x1, y1}, {x2, y2}, i, edge)
+      draw_clipped_segment(acc, {sx, sy}, {ex, ey}, chars)
     end)
   end
 
-  defp draw_clipped_segment(canvas, x1, y1, x2, y2, seg_index, edge, h_char, v_char) do
+  defp clip_segment({x1, y1}, {x2, y2}, seg_index, edge) do
     dx = sign(x2 - x1)
     dy = sign(y2 - y1)
 
-    {sx, sy} = {x1 + dx, y1 + dy}
-
     {sx, sy} =
       if seg_index == 0 and edge.has_arrow_start do
-        {sx + dx, sy + dy}
+        {x1 + dx + dx, y1 + dy + dy}
       else
-        {sx, sy}
+        {x1 + dx, y1 + dy}
       end
 
-    {ex, ey} = {x2 - dx, y2 - dy}
+    {sx, sy, x2 - dx, y2 - dy}
+  end
+
+  defp draw_clipped_segment(canvas, {sx, sy}, {ex, ey}, {h_char, v_char}) do
+    dx = sign(ex - sx)
+    dy = sign(ey - sy)
 
     cond do
       dy == 0 and not segment_valid?(sx, ex, dx) -> canvas
@@ -337,14 +343,14 @@ defmodule Boxart.Render do
 
   defp rounded_corners(cs) do
     %{
-      {1, 0, 0, 1} => cs.round_top_right,
-      {1, 0, 0, -1} => cs.round_bottom_right,
-      {-1, 0, 0, 1} => cs.round_top_left,
-      {-1, 0, 0, -1} => cs.round_bottom_left,
-      {0, 1, 1, 0} => cs.round_bottom_left,
-      {0, 1, -1, 0} => cs.round_bottom_right,
-      {0, -1, 1, 0} => cs.round_top_left,
-      {0, -1, -1, 0} => cs.round_top_right
+      {1, 0, 0, 1} => cs.box.round_top_right,
+      {1, 0, 0, -1} => cs.box.round_bottom_right,
+      {-1, 0, 0, 1} => cs.box.round_top_left,
+      {-1, 0, 0, -1} => cs.box.round_bottom_left,
+      {0, 1, 1, 0} => cs.box.round_bottom_left,
+      {0, 1, -1, 0} => cs.box.round_bottom_right,
+      {0, -1, 1, 0} => cs.box.round_top_left,
+      {0, -1, -1, 0} => cs.box.round_top_right
     }
   end
 
@@ -378,19 +384,19 @@ defmodule Boxart.Render do
 
     ch =
       case arrow_type do
-        :circle -> cs.circle_endpoint
-        :cross -> cs.cross_endpoint
+        :circle -> cs.markers.circle_endpoint
+        :cross -> cs.markers.cross_endpoint
         _ -> arrow_char(ndx, ndy, cs)
       end
 
     Canvas.put(canvas, ax, ay, ch)
   end
 
-  defp arrow_char(ndx, _ndy, cs) when ndx > 0, do: cs.arrow_right
-  defp arrow_char(ndx, _ndy, cs) when ndx < 0, do: cs.arrow_left
-  defp arrow_char(_ndx, ndy, cs) when ndy > 0, do: cs.arrow_down
-  defp arrow_char(_ndx, ndy, cs) when ndy < 0, do: cs.arrow_up
-  defp arrow_char(_ndx, _ndy, cs), do: cs.arrow_down
+  defp arrow_char(ndx, _ndy, cs) when ndx > 0, do: cs.arrows.right
+  defp arrow_char(ndx, _ndy, cs) when ndx < 0, do: cs.arrows.left
+  defp arrow_char(_ndx, ndy, cs) when ndy > 0, do: cs.arrows.down
+  defp arrow_char(_ndx, ndy, cs) when ndy < 0, do: cs.arrows.up
+  defp arrow_char(_ndx, _ndy, cs), do: cs.arrows.down
 
   # -- T-junctions --
 
@@ -414,20 +420,20 @@ defmodule Boxart.Render do
   defp maybe_draw_tee_end(canvas, _edge, _path, _cs), do: canvas
 
   defp draw_tee(canvas, {ex, ey}, {nx, ny}, cs) do
-    dx = nx - ex
-    dy = ny - ey
-    is_unicode = cs.horizontal == "─"
+    case tee_char(nx - ex, ny - ey, cs) do
+      nil -> canvas
+      tee -> Canvas.put(canvas, ex, ey, tee)
+    end
+  end
 
-    tee =
-      cond do
-        dx > 0 -> if(is_unicode, do: cs.tee_right, else: "+")
-        dx < 0 -> if(is_unicode, do: cs.tee_left, else: "+")
-        dy > 0 -> if(is_unicode, do: cs.tee_down, else: "+")
-        dy < 0 -> if(is_unicode, do: cs.tee_up, else: "+")
-        true -> nil
-      end
+  defp tee_char(dx, _dy, cs) when dx > 0, do: tee_or_plus(cs, :tee_right)
+  defp tee_char(dx, _dy, cs) when dx < 0, do: tee_or_plus(cs, :tee_left)
+  defp tee_char(_dx, dy, cs) when dy > 0, do: tee_or_plus(cs, :tee_down)
+  defp tee_char(_dx, dy, cs) when dy < 0, do: tee_or_plus(cs, :tee_up)
+  defp tee_char(_dx, _dy, _cs), do: nil
 
-    if tee, do: Canvas.put(canvas, ex, ey, tee), else: canvas
+  defp tee_or_plus(cs, key) do
+    if cs.box.horizontal == "─", do: Map.fetch!(cs.junctions, key), else: "+"
   end
 
   # -- Edge labels --
@@ -485,7 +491,7 @@ defmodule Boxart.Render do
     {x2, y2} = Enum.at(path, i + 1)
     prev = if i > 0, do: Enum.at(path, i - 1), else: nil
 
-    case try_place_on_segment(canvas, x1, y1, x2, y2, label, label_len, placed,
+    case try_place_on_segment({x1, y1, x2, y2}, canvas, label, label_len, placed,
            prev_point: prev,
            prefer_left: is_straight,
            bias_target: is_straight
@@ -495,25 +501,12 @@ defmodule Boxart.Render do
     end
   end
 
-  defp try_place_on_segment(canvas, x1, y1, x2, y2, label, label_len, placed, opts) do
-    prev_point = Keyword.get(opts, :prev_point)
-    prefer_left = Keyword.get(opts, :prefer_left, false)
-    bias_target = Keyword.get(opts, :bias_target, false)
+  defp try_place_on_segment(segment, canvas, label, label_len, placed, opts) do
+    {x1, y1, x2, y2} = segment
 
     cond do
       x1 == x2 and abs(y2 - y1) >= 2 ->
-        try_place_vertical(
-          canvas,
-          x1,
-          y1,
-          y2,
-          label,
-          label_len,
-          placed,
-          prev_point,
-          prefer_left,
-          bias_target
-        )
+        try_place_vertical({x1, y1, y2}, canvas, label, label_len, placed, opts)
 
       y1 == y2 ->
         try_place_horizontal(canvas, x1, x2, y1, label, label_len, placed)
@@ -523,18 +516,10 @@ defmodule Boxart.Render do
     end
   end
 
-  defp try_place_vertical(
-         canvas,
-         x,
-         y1,
-         y2,
-         label,
-         label_len,
-         placed,
-         prev_point,
-         prefer_left,
-         bias_target
-       ) do
+  defp try_place_vertical({x, y1, y2}, canvas, label, label_len, placed, opts) do
+    prev_point = Keyword.get(opts, :prev_point)
+    bias_target = Keyword.get(opts, :bias_target, false)
+
     mid_y =
       if bias_target do
         y1 + div((y2 - y1) * 2, 3)
@@ -542,13 +527,7 @@ defmodule Boxart.Render do
         div(min(y1, y2) + max(y1, y2), 2)
       end
 
-    prefer_left =
-      if not prefer_left and prev_point != nil do
-        {px, _py} = prev_point
-        px > x
-      else
-        prefer_left
-      end
+    prefer_left = resolve_prefer_left(Keyword.get(opts, :prefer_left, false), prev_point, x)
 
     sides =
       if prefer_left do
@@ -572,6 +551,10 @@ defmodule Boxart.Render do
         |> try_place_positions_list(canvas, label, placed)
     end
   end
+
+  defp resolve_prefer_left(true, _prev_point, _x), do: true
+  defp resolve_prefer_left(false, nil, _x), do: false
+  defp resolve_prefer_left(false, {px, _py}, x), do: px > x
 
   defp try_place_horizontal(canvas, x1, x2, y, label, label_len, placed) do
     seg_len = abs(x2 - x1)

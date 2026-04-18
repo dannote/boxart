@@ -88,62 +88,62 @@ defmodule Boxart.Layout.Subgraphs do
 
     sorted_flow
     |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.reduce(layout, fn [pos1, pos2], l ->
-      nodes1 = Map.get(flow_groups, pos1, [])
-      nodes2 = Map.get(flow_groups, pos2, [])
+    |> Enum.reduce(
+      layout,
+      &expand_flow_gap_pair(&1, &2, graph, flow_groups, node_depths, vertical)
+    )
+  end
 
-      min_depth1 = nodes1 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.min(fn -> 0 end)
-      max_depth2 = nodes2 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.max(fn -> 0 end)
-      entering = max(0, max_depth2 - min_depth1)
+  defp expand_flow_gap_pair([pos1, pos2], layout, graph, flow_groups, node_depths, vertical) do
+    nodes1 = Map.get(flow_groups, pos1, [])
+    nodes2 = Map.get(flow_groups, pos2, [])
 
-      min_depth2 = nodes2 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.min(fn -> 0 end)
-      max_depth1 = nodes1 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.max(fn -> 0 end)
-      exiting = max(0, max_depth1 - min_depth2)
+    depth_change = compute_depth_change(graph, nodes1, nodes2, node_depths)
 
-      depth_change = max(entering, exiting)
+    if depth_change > 0 do
+      extra = depth_change * @sg_gap_per_level
+      expand_gap_cells(layout, pos1 + 2, pos2 - 2, extra, vertical)
+    else
+      layout
+    end
+  end
 
-      depth_change =
-        if depth_change == 0 do
-          sg_ids1 =
-            nodes1
-            |> Enum.map(&Graph.find_subgraph_for_node(graph, &1))
-            |> Enum.reject(&is_nil/1)
-            |> Enum.map(& &1.id)
-            |> MapSet.new()
+  defp compute_depth_change(graph, nodes1, nodes2, node_depths) do
+    min_depth1 = nodes1 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.min(fn -> 0 end)
+    max_depth2 = nodes2 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.max(fn -> 0 end)
+    entering = max(0, max_depth2 - min_depth1)
 
-          sg_ids2 =
-            nodes2
-            |> Enum.map(&Graph.find_subgraph_for_node(graph, &1))
-            |> Enum.reject(&is_nil/1)
-            |> Enum.map(& &1.id)
-            |> MapSet.new()
+    min_depth2 = nodes2 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.min(fn -> 0 end)
+    max_depth1 = nodes1 |> Enum.map(&Map.get(node_depths, &1, 0)) |> Enum.max(fn -> 0 end)
+    exiting = max(0, max_depth1 - min_depth2)
 
-          if MapSet.size(sg_ids1) > 0 and MapSet.size(sg_ids2) > 0 and
-               not MapSet.equal?(sg_ids1, sg_ids2) do
-            2
-          else
-            0
-          end
-        else
-          depth_change
-        end
+    depth_change = max(entering, exiting)
 
-      if depth_change > 0 do
-        extra = depth_change * @sg_gap_per_level
+    if depth_change == 0 do
+      check_sibling_transition(graph, nodes1, nodes2)
+    else
+      depth_change
+    end
+  end
 
-        Enum.reduce((pos1 + 2)..(pos2 - 2)//1, l, fn gap, acc ->
-          if vertical do
-            cur = Map.get(acc.row_heights, gap, 1)
-            %{acc | row_heights: Map.put(acc.row_heights, gap, max(cur, extra))}
-          else
-            cur = Map.get(acc.col_widths, gap, 2)
-            %{acc | col_widths: Map.put(acc.col_widths, gap, max(cur, extra))}
-          end
-        end)
-      else
-        l
-      end
-    end)
+  defp check_sibling_transition(graph, nodes1, nodes2) do
+    sg_ids1 = nodes_to_sg_ids(graph, nodes1)
+    sg_ids2 = nodes_to_sg_ids(graph, nodes2)
+
+    if MapSet.size(sg_ids1) > 0 and MapSet.size(sg_ids2) > 0 and
+         not MapSet.equal?(sg_ids1, sg_ids2) do
+      2
+    else
+      0
+    end
+  end
+
+  defp nodes_to_sg_ids(graph, nodes) do
+    nodes
+    |> Enum.map(&Graph.find_subgraph_for_node(graph, &1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(& &1.id)
+    |> MapSet.new()
   end
 
   defp expand_cross_gaps(layout, graph, cross_groups, vertical) do
@@ -151,39 +151,32 @@ defmodule Boxart.Layout.Subgraphs do
 
     sorted_cross
     |> Enum.chunk_every(2, 1, :discard)
-    |> Enum.reduce(layout, fn [pos1, pos2], l ->
-      nodes1 = Map.get(cross_groups, pos1, [])
-      nodes2 = Map.get(cross_groups, pos2, [])
+    |> Enum.reduce(layout, &expand_cross_gap_pair(&1, &2, graph, cross_groups, vertical))
+  end
 
-      inner1 =
-        nodes1
-        |> Enum.map(&Graph.find_subgraph_for_node(graph, &1))
-        |> Enum.reject(&is_nil/1)
-        |> Enum.map(& &1.id)
-        |> MapSet.new()
+  defp expand_cross_gap_pair([pos1, pos2], layout, graph, cross_groups, vertical) do
+    nodes1 = Map.get(cross_groups, pos1, [])
+    nodes2 = Map.get(cross_groups, pos2, [])
 
-      inner2 =
-        nodes2
-        |> Enum.map(&Graph.find_subgraph_for_node(graph, &1))
-        |> Enum.reject(&is_nil/1)
-        |> Enum.map(& &1.id)
-        |> MapSet.new()
+    inner1 = nodes_to_sg_ids(graph, nodes1)
+    inner2 = nodes_to_sg_ids(graph, nodes2)
 
-      if (MapSet.size(inner1) > 0 or MapSet.size(inner2) > 0) and
-           not MapSet.equal?(inner1, inner2) do
-        extra = 8
+    if (MapSet.size(inner1) > 0 or MapSet.size(inner2) > 0) and
+         not MapSet.equal?(inner1, inner2) do
+      expand_gap_cells(layout, pos1 + 2, pos2 - 2, 8, not vertical)
+    else
+      layout
+    end
+  end
 
-        Enum.reduce((pos1 + 2)..(pos2 - 2)//1, l, fn gap, acc ->
-          if vertical do
-            cur = Map.get(acc.col_widths, gap, 2)
-            %{acc | col_widths: Map.put(acc.col_widths, gap, max(cur, extra))}
-          else
-            cur = Map.get(acc.row_heights, gap, 1)
-            %{acc | row_heights: Map.put(acc.row_heights, gap, max(cur, extra))}
-          end
-        end)
+  defp expand_gap_cells(layout, gap_start, gap_end, extra, vertical) do
+    Enum.reduce(gap_start..gap_end//1, layout, fn gap, acc ->
+      if vertical do
+        cur = Map.get(acc.row_heights, gap, 1)
+        %{acc | row_heights: Map.put(acc.row_heights, gap, max(cur, extra))}
       else
-        l
+        cur = Map.get(acc.col_widths, gap, 2)
+        %{acc | col_widths: Map.put(acc.col_widths, gap, max(cur, extra))}
       end
     end)
   end
@@ -196,15 +189,7 @@ defmodule Boxart.Layout.Subgraphs do
       end)
 
     all_node_ids = gather_all_nodes(sg)
-
-    node_extents =
-      all_node_ids
-      |> Enum.flat_map(fn nid ->
-        case Map.get(layout.placements, nid) do
-          nil -> []
-          p -> [{p.draw_x, p.draw_y, p.draw_x + p.draw_width, p.draw_y + p.draw_height}]
-        end
-      end)
+    node_extents = collect_node_extents(layout, all_node_ids)
 
     child_extents =
       Enum.map(child_bounds, fn cb ->
@@ -216,30 +201,42 @@ defmodule Boxart.Layout.Subgraphs do
     if all_extents == [] do
       {child_bounds, layout}
     else
-      {min_x, min_y, max_x, max_y} =
-        Enum.reduce(all_extents, {nil, nil, 0, 0}, fn {x1, y1, x2, y2}, {mx1, my1, mx2, my2} ->
-          {
-            if(mx1 == nil, do: x1, else: min(mx1, x1)),
-            if(my1 == nil, do: y1, else: min(my1, y1)),
-            max(mx2, x2),
-            max(my2, y2)
-          }
-        end)
-
-      content_width = max_x - min_x + @sg_border_pad * 2
-      label_width = String.length(sg.label) + 4
-      final_width = max(content_width, label_width)
-
-      bounds = %SubgraphBounds{
-        subgraph_id: sg.id,
-        x: min_x - @sg_border_pad,
-        y: min_y - @sg_border_pad - @sg_label_height,
-        width: final_width,
-        height: max_y - min_y + @sg_border_pad * 2 + @sg_label_height
-      }
-
+      bounds = build_bounds_from_extents(sg, all_extents)
       {child_bounds ++ [bounds], layout}
     end
+  end
+
+  defp collect_node_extents(layout, node_ids) do
+    Enum.flat_map(node_ids, fn nid ->
+      case Map.get(layout.placements, nid) do
+        nil -> []
+        p -> [{p.draw_x, p.draw_y, p.draw_x + p.draw_width, p.draw_y + p.draw_height}]
+      end
+    end)
+  end
+
+  defp build_bounds_from_extents(sg, extents) do
+    {min_x, min_y, max_x, max_y} =
+      Enum.reduce(extents, {nil, nil, 0, 0}, fn {x1, y1, x2, y2}, {mx1, my1, mx2, my2} ->
+        {
+          if(mx1 == nil, do: x1, else: min(mx1, x1)),
+          if(my1 == nil, do: y1, else: min(my1, y1)),
+          max(mx2, x2),
+          max(my2, y2)
+        }
+      end)
+
+    content_width = max_x - min_x + @sg_border_pad * 2
+    label_width = String.length(sg.label) + 4
+    final_width = max(content_width, label_width)
+
+    %SubgraphBounds{
+      subgraph_id: sg.id,
+      x: min_x - @sg_border_pad,
+      y: min_y - @sg_border_pad - @sg_label_height,
+      width: final_width,
+      height: max_y - min_y + @sg_border_pad * 2 + @sg_label_height
+    }
   end
 
   defp gather_all_nodes(sg) do

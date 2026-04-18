@@ -250,21 +250,7 @@ defmodule Boxart.Canvas do
     text
     |> String.graphemes()
     |> Enum.reduce({canvas, 0}, fn ch, {canvas, offset} ->
-      canvas = put(canvas, col + offset, row, ch, merge: false, style: style)
-
-      if wide_char?(ch) do
-        canvas =
-          if in_bounds?(canvas, col + offset + 1, row) do
-            cell = %Cell{char: "", directions: 0, style: effective_style(style)}
-            put_cell(canvas, col + offset + 1, row, cell)
-          else
-            canvas
-          end
-
-        {canvas, offset + 2}
-      else
-        {canvas, offset + 1}
-      end
+      put_grapheme(canvas, col, row, offset, ch, style)
     end)
     |> elem(0)
   end
@@ -278,21 +264,7 @@ defmodule Boxart.Canvas do
       text
       |> String.graphemes()
       |> Enum.reduce({canvas, offset}, fn ch, {canvas, off} ->
-        canvas = put(canvas, col + off, row, ch, merge: false, style: style)
-
-        if wide_char?(ch) do
-          canvas =
-            if in_bounds?(canvas, col + off + 1, row) do
-              cell = %Cell{char: "", directions: 0, style: style}
-              put_cell(canvas, col + off + 1, row, cell)
-            else
-              canvas
-            end
-
-          {canvas, off + 2}
-        else
-          {canvas, off + 1}
-        end
+        put_grapheme(canvas, col, row, off, ch, style)
       end)
     end)
     |> elem(0)
@@ -355,14 +327,7 @@ defmodule Boxart.Canvas do
     0..(canvas.height - 1)
     |> Enum.map(fn r ->
       0..(canvas.width - 1)
-      |> Enum.map(fn c ->
-        case Map.get(canvas.cells, {c, r}) do
-          nil -> " "
-          %Cell{char: ""} -> ""
-          cell -> cell.char
-        end
-      end)
-      |> Enum.join()
+      |> Enum.map_join(fn c -> cell_char(canvas, c, r) end)
       |> String.trim_trailing()
     end)
     |> Enum.reverse()
@@ -483,6 +448,33 @@ defmodule Boxart.Canvas do
 
   # --- Private helpers ---
 
+  defp put_grapheme(canvas, col, row, offset, ch, style) do
+    canvas = put(canvas, col + offset, row, ch, merge: false, style: style)
+
+    if wide_char?(ch) do
+      canvas = put_wide_placeholder(canvas, col + offset + 1, row, style)
+      {canvas, offset + 2}
+    else
+      {canvas, offset + 1}
+    end
+  end
+
+  defp put_wide_placeholder(canvas, col, row, style) do
+    if in_bounds?(canvas, col, row) do
+      put_cell(canvas, col, row, %Cell{char: "", directions: 0, style: effective_style(style)})
+    else
+      canvas
+    end
+  end
+
+  defp cell_char(canvas, c, r) do
+    case Map.get(canvas.cells, {c, r}) do
+      nil -> " "
+      %Cell{char: ""} -> ""
+      cell -> cell.char
+    end
+  end
+
   defp in_bounds?(%__MODULE__{width: w, height: h}, col, row) do
     col >= 0 and col < w and row >= 0 and row < h
   end
@@ -511,22 +503,15 @@ defmodule Boxart.Canvas do
     flipped
   end
 
-  defp wide_char?(ch) do
-    case ch |> String.to_charlist() |> hd() do
-      cp when cp in 0x1100..0x115F -> true
-      cp when cp in 0x2E80..0x303E -> true
-      cp when cp in 0x3041..0x33BF -> true
-      cp when cp in 0x3400..0x4DBF -> true
-      cp when cp in 0x4E00..0x9FFF -> true
-      cp when cp in 0xF900..0xFAFF -> true
-      cp when cp in 0xFE30..0xFE6F -> true
-      cp when cp in 0xFF01..0xFF60 -> true
-      cp when cp in 0xFFE0..0xFFE6 -> true
-      cp when cp in 0x20000..0x2FFFF -> true
-      cp when cp in 0x30000..0x3FFFF -> true
-      _ -> false
-    end
-  end
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x1100..0x115F, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x2E80..0x33BF, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x3400..0x9FFF, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xF900..0xFAFF, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFE30..0xFE6F, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFF01..0xFF60, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFFE0..0xFFE6, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x20000..0x3FFFF, do: true
+  defp wide_char?(_), do: false
 
   defimpl String.Chars do
     def to_string(canvas), do: Boxart.Canvas.to_string(canvas)

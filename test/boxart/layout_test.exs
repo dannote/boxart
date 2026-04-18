@@ -2,7 +2,7 @@ defmodule Boxart.LayoutTest do
   use ExUnit.Case, async: true
 
   alias Boxart.Graph
-  alias Boxart.Graph.{Node, Edge}
+  alias Boxart.Graph.{Edge, Node}
   alias Boxart.Layout
 
   defp graph(direction, edges, extra_nodes \\ []) do
