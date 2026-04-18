@@ -69,17 +69,18 @@ defmodule Boxart.Render do
       step_opts = Keyword.merge(opts, overrides) |> Keyword.delete(:max_width)
 
       case render_graph_canvas(graph, step_opts) do
-        nil ->
-          {:cont, best}
-
-        canvas ->
-          if canvas.width <= max_width do
-            {:halt, canvas}
-          else
-            if canvas.width < best.width, do: {:cont, canvas}, else: {:cont, best}
-          end
+        nil -> {:cont, best}
+        canvas -> pick_compact(canvas, best, max_width)
       end
     end)
+  end
+
+  defp pick_compact(canvas, best, max_width) do
+    cond do
+      canvas.width <= max_width -> {:halt, canvas}
+      canvas.width < best.width -> {:cont, canvas}
+      true -> {:cont, best}
+    end
   end
 
   defp render_canvas_to_string(canvas, opts) do

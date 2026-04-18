@@ -1,20 +1,46 @@
 # Changelog
 
+## v0.3.0
+
+### New features
+
+- **Progressive compaction** — when `max_width` is set and the graph is too wide,
+  Boxart tries progressively compact settings (smaller gap, then padding) before
+  falling back to canvas clamping. Ported from termaid's auto-fit behavior.
+
+- **Layout stacking** — when compaction isn't enough, sibling nodes in the same
+  layer are stacked vertically (single column) instead of side-by-side, keeping
+  all nodes fully rendered with intact borders.
+
+- **Syntax highlighting in themed output** — code nodes with `:language` now
+  render with Makeup syntax colors (keywords, functions, strings, operators)
+  alongside the theme's structural colors.
+
+### Improvements
+
+- `max_width` now operates at the canvas cell level instead of string truncation —
+  no more broken box-drawing characters or split ANSI escapes
+- Labels are pre-wrapped by the layout engine and stored in `Layout.wrapped_labels` —
+  the shapes renderer no longer re-wraps at a hardcoded width
+- `max_label_width` option correctly flows through the entire pipeline
+- Mindmap renderer handles tuple vertices without crashing (`inspect` instead of `to_string`)
+- `Boxart.Graph.with_direction/2` helper for direction changes
+
+### Bug fixes
+
+- Shapes module no longer re-wraps labels at hardcoded 20-char width, respecting
+  the `max_label_width` option
+- `stamp_node_style` preserves Makeup ANSI styles instead of overwriting them
+  with the node theme color
+- `render_ansi_chunk` passes through raw ANSI escapes from syntax highlighting
+- Dialyzer spec fixed: `render_graph_canvas` uses `BGraph.t()` not `Graph.t()`
+
 ## v0.2.0
 
 ### New features
 
 - **`max_width` option** — clamp output to terminal width by truncating lines
 - **`max_label_width` option** — configurable word wrapping threshold (default: 20)
-
-### Example
-
-```elixir
-Boxart.render(graph,
-  max_width: 80,
-  max_label_width: 30
-)
-```
 
 ## v0.1.0
 

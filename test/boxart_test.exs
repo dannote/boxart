@@ -1,6 +1,8 @@
 defmodule BoxartTest do
   use ExUnit.Case
 
+  alias Boxart.Render.Mindmap
+
   test "render returns empty string for empty graph" do
     graph = Graph.new()
     assert Boxart.render(graph) == ""
@@ -216,7 +218,7 @@ defmodule BoxartTest do
       |> Graph.add_vertex({:mod, :dep, 0}, label: "dep/0")
       |> Graph.add_edge({:mod, :fun, 1}, {:mod, :dep, 0})
 
-    out = Boxart.Render.Mindmap.render(g)
+    out = Mindmap.render(g)
     assert String.contains?(out, "fun/1")
     assert String.contains?(out, "dep/0")
   end
