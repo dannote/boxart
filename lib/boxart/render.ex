@@ -308,6 +308,7 @@ defmodule Boxart.Render do
           %{char: " "} -> acc
           %{style: "label"} -> acc
           %{style: "dim"} -> acc
+          %{style: "\e[" <> _} -> acc
           nil -> acc
           cell -> %{acc | cells: Map.put(acc.cells, {col, row}, %{cell | style: "node"})}
         end

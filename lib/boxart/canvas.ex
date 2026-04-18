@@ -410,9 +410,15 @@ defmodule Boxart.Canvas do
     {chars, style_key} = {Enum.map(cells, &elem(&1, 0)), elem(hd(cells), 1)}
     text = Enum.join(chars)
 
-    case Map.get(style_map, style_key, []) do
-      [] -> text
-      styles -> IO.ANSI.format(styles ++ [text], true)
+    cond do
+      String.starts_with?(style_key, "\e[") ->
+        style_key <> text <> "\e[0m"
+
+      (styles = Map.get(style_map, style_key, [])) != [] ->
+        IO.ANSI.format(styles ++ [text], true)
+
+      true ->
+        text
     end
   end
 
