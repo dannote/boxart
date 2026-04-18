@@ -23,7 +23,7 @@ defmodule Boxart.Canvas do
   @type style :: String.t()
 
   defmodule Cell do
-    @moduledoc false
+    @moduledoc "A single cell in the canvas grid."
 
     @type t :: %__MODULE__{
             char: String.t(),

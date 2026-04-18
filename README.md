@@ -137,10 +137,15 @@ Graph.add_edge(g, "A", "B", label: "yes")
 
 Beyond directed graphs, Boxart includes standalone renderers for:
 
+- `Boxart.Render.StateDiagram` — state machine diagrams with start/end markers
 - `Boxart.Render.Sequence` — sequence diagrams with lifelines, messages,
   activation boxes, notes, and interaction blocks
-- `Boxart.Render.Mindmap` — tree layout with left/right branching
+- `Boxart.Render.GitGraph` — git branch/commit visualization
+- `Boxart.Render.Gantt` — Gantt charts with task bars and time axis
+- `Boxart.Render.Mindmap` — tree layout with left/right branching (accepts `Graph.t()`)
 - `Boxart.Render.PieChart` — horizontal bar charts
+
+All renderers implement the `Boxart.Diagram` behaviour.
 
 ## Options
 

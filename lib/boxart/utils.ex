@@ -18,14 +18,14 @@ defmodule Boxart.Utils do
     end)
   end
 
-  @doc false
+  @doc "Right-justify `str` to `width` using spaces."
   @spec rjust(String.t(), non_neg_integer()) :: String.t()
   def rjust(str, width) do
     pad = max(width - display_width(str), 0)
     String.duplicate(" ", pad) <> str
   end
 
-  @doc false
+  @doc "Left-justify `str` to `width` using spaces."
   @spec ljust(String.t(), non_neg_integer()) :: String.t()
   def ljust(str, width) do
     pad = max(width - display_width(str), 0)

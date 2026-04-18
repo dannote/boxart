@@ -31,7 +31,7 @@ defmodule Boxart.Render.Mindmap do
   @overflow_threshold 6
 
   defmodule MindmapNode do
-    @moduledoc false
+    @moduledoc "A node in the mindmap tree."
     @type t :: %__MODULE__{label: String.t(), children: [t()]}
     defstruct [:label, children: []]
   end

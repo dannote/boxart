@@ -21,13 +21,13 @@ defmodule Boxart.Render.Sequence do
   @type arrow_type :: :arrow | :open | :cross | :async
 
   defmodule Participant do
-    @moduledoc false
+    @moduledoc "A participant in the sequence diagram."
     @type t :: %__MODULE__{id: String.t(), label: String.t(), type: :participant | :actor}
     defstruct [:id, :label, type: :participant]
   end
 
   defmodule Message do
-    @moduledoc false
+    @moduledoc "Sequence diagram message data."
 
     @type t :: %__MODULE__{
             from: String.t(),
@@ -40,7 +40,7 @@ defmodule Boxart.Render.Sequence do
   end
 
   defmodule Note do
-    @moduledoc false
+    @moduledoc "Sequence diagram note data."
     @type t :: %__MODULE__{
             text: String.t(),
             position: :right_of | :left_of | :over,
@@ -50,13 +50,13 @@ defmodule Boxart.Render.Sequence do
   end
 
   defmodule BlockSection do
-    @moduledoc false
+    @moduledoc "Sequence diagram blocksection data."
     @type t :: %__MODULE__{label: String.t(), events: [any()]}
     defstruct label: "", events: []
   end
 
   defmodule Block do
-    @moduledoc false
+    @moduledoc "Sequence diagram block data."
     @type t :: %__MODULE__{
             kind: String.t(),
             label: String.t(),
@@ -67,13 +67,13 @@ defmodule Boxart.Render.Sequence do
   end
 
   defmodule Activate do
-    @moduledoc false
+    @moduledoc "Sequence diagram activate data."
     @type t :: %__MODULE__{participant: String.t(), active: boolean()}
     defstruct [:participant, :active]
   end
 
   defmodule Destroy do
-    @moduledoc false
+    @moduledoc "Sequence diagram destroy data."
     @type t :: %__MODULE__{participant: String.t()}
     defstruct [:participant]
   end
@@ -81,7 +81,7 @@ defmodule Boxart.Render.Sequence do
   @type event :: Message.t() | Note.t() | Block.t() | Activate.t() | Destroy.t()
 
   defmodule SequenceDiagram do
-    @moduledoc false
+    @moduledoc "A sequence diagram with participants and events."
     @type t :: %__MODULE__{
             participants: [Boxart.Render.Sequence.Participant.t()],
             events: [Boxart.Render.Sequence.event()],
@@ -102,22 +102,22 @@ defmodule Boxart.Render.Sequence do
   @bottom_margin 1
 
   defmodule BlockStart do
-    @moduledoc false
+    @moduledoc "Sequence diagram blockstart data."
     defstruct [:block, :depth]
   end
 
   defmodule BlockSectionBreak do
-    @moduledoc false
+    @moduledoc "Sequence diagram blocksectionbreak data."
     defstruct [:section, :depth]
   end
 
   defmodule BlockEnd do
-    @moduledoc false
+    @moduledoc "Sequence diagram blockend data."
     defstruct [:block, :depth]
   end
 
   defmodule Layout do
-    @moduledoc false
+    @moduledoc "Sequence diagram layout data."
     defstruct [:col_centers, :box_widths, :width, :height, :header_height, :row_offsets]
   end
 

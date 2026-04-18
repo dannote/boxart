@@ -12,7 +12,7 @@ defmodule Boxart.Render.PieChart do
   alias Boxart.Utils
 
   defmodule PieChart do
-    @moduledoc false
+    @moduledoc "A pie chart with title and slices."
     @type t :: %__MODULE__{
             title: String.t(),
             slices: [{String.t(), number()}],

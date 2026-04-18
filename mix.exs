@@ -61,7 +61,34 @@ defmodule Boxart.MixProject do
       main: "Boxart",
       extras: ["README.md", "LICENSE"],
       source_url: @source_url,
-      source_ref: "master"
+      source_ref: "master",
+      groups_for_modules: [
+        "Public API": [Boxart, Boxart.Diagram, Boxart.Theme],
+        "Graph Rendering": [
+          Boxart.Render,
+          Boxart.Render.Shapes,
+          Boxart.CodeNode,
+          Boxart.Highlight
+        ],
+        "Specialized Renderers": [
+          Boxart.Render.StateDiagram,
+          Boxart.Render.Sequence,
+          Boxart.Render.GitGraph,
+          Boxart.Render.Gantt,
+          Boxart.Render.Mindmap,
+          Boxart.Render.PieChart
+        ],
+        "Layout Engine": [
+          Boxart.Layout,
+          Boxart.Layout.Layers,
+          Boxart.Layout.Placement,
+          Boxart.Layout.Coordinates,
+          Boxart.Layout.Subgraphs
+        ],
+        Routing: [Boxart.Routing, Boxart.Routing.Pathfinder],
+        "Canvas & Charset": [Boxart.Canvas, Boxart.Charset],
+        Internal: [Boxart.Graph, Boxart.Utils]
+      ]
     ]
   end
 
