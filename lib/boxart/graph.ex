@@ -227,7 +227,13 @@ defmodule Boxart.Graph do
          }}
       end)
 
-    node_order = Enum.map(vertices, &to_id/1)
+    node_order =
+      case Graph.topsort(libgraph) do
+        false -> bfs_order(libgraph, vertices)
+        sorted -> Enum.map(sorted, &to_id/1)
+      end
+
+    order_index = node_order |> Enum.with_index() |> Map.new()
 
     edges =
       Graph.edges(libgraph)
@@ -238,6 +244,11 @@ defmodule Boxart.Graph do
           label: edge_label(edge_lbl)
         }
       end)
+      |> Enum.sort_by(fn e ->
+        si = Map.get(order_index, e.source, 999_999)
+        ti = Map.get(order_index, e.target, 999_999)
+        {si, ti}
+      end)
 
     %__MODULE__{
       direction: direction,
@@ -245,6 +256,18 @@ defmodule Boxart.Graph do
       edges: edges,
       node_order: node_order
     }
+  end
+
+  defp bfs_order(libgraph, vertices) do
+    in_edges = Map.new(vertices, fn v -> {v, length(Graph.in_neighbors(libgraph, v))} end)
+    out_edges = Map.new(vertices, fn v -> {v, length(Graph.out_neighbors(libgraph, v))} end)
+
+    sorted =
+      Enum.sort_by(vertices, fn v ->
+        {Map.get(in_edges, v, 0) - Map.get(out_edges, v, 0), to_id(v)}
+      end)
+
+    Enum.map(sorted, &to_id/1)
   end
 
   defp to_id(v) when is_binary(v), do: v
@@ -330,9 +353,18 @@ defmodule Boxart.Graph do
     roots = Enum.filter(order, &(&1 not in targets))
 
     case roots do
-      [] -> Enum.take(order, 1)
+      [] -> [best_root_candidate(edges, order)]
       _ -> roots
     end
+  end
+
+  defp best_root_candidate(edges, order) do
+    out_degree =
+      Enum.reduce(edges, %{}, fn e, acc ->
+        Map.update(acc, e.source, 1, &(&1 + 1))
+      end)
+
+    Enum.max_by(order, &Map.get(out_degree, &1, 0))
   end
 
   @doc "Returns ids of nodes reachable via outgoing edges from `node_id`, in edge order."

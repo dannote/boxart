@@ -131,7 +131,7 @@ defmodule Boxart.Layout.Layers do
   end
 
   defp discover_tree_edges(%Graph{} = graph, roots) do
-    {_visited, tree_edges} =
+    {visited, tree_edges} =
       roots
       |> Enum.reduce({MapSet.new(), MapSet.new()}, fn root, {visited, edges} ->
         if MapSet.member?(visited, root) do
@@ -142,7 +142,7 @@ defmodule Boxart.Layout.Layers do
       end)
 
     graph.node_order
-    |> Enum.reduce({MapSet.new(roots), tree_edges}, fn nid, {visited, edges} ->
+    |> Enum.reduce({visited, tree_edges}, fn nid, {visited, edges} ->
       if MapSet.member?(visited, nid) do
         {visited, edges}
       else
