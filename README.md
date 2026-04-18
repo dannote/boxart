@@ -149,6 +149,30 @@ Beyond directed graphs, Boxart includes standalone renderers for:
 
 All renderers implement the `Boxart.Diagram` behaviour.
 
+## Color themes
+
+Pass `:theme` to render with ANSI colors in the terminal:
+
+```elixir
+Boxart.render(graph, theme: :dracula)
+```
+
+Built-in themes: `:default`, `:mono`, `:neon`, `:dracula`, `:nord`, `:amber`, `:phosphor`.
+
+Custom themes via struct:
+
+```elixir
+theme = %Boxart.Theme{
+  node: [:blue],
+  edge: [:faint],
+  arrow: [:red, :bright],
+  label: [:bright],
+  edge_label: [:italic, :faint]
+}
+
+Boxart.render(graph, theme: theme)
+```
+
 ## Options
 
 ```elixir
