@@ -90,9 +90,13 @@ def deps do
 end
 ```
 
-## Acknowledgements
+## Prior art
 
-Layout engine ported from [termaid](https://github.com/fasouto/termaid) by Fabio Souto (MIT).
+Boxart's layout engine is an Elixir port of [termaid](https://github.com/fasouto/termaid) by Fabio Souto,
+which itself was inspired by [mermaid-ascii](https://github.com/AlexanderGrooff/mermaid-ascii) by Alexander Grooff.
+We also evaluated [beautiful-mermaid](https://github.com/lukilabs/beautiful-mermaid) by Craft
+and chose termaid for its cleaner layout pipeline (Sugiyama-style with barycenter crossing
+minimization, A* routing with soft obstacles, and direction-aware canvas junction merging).
 
 ## License
 
