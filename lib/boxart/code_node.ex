@@ -62,8 +62,8 @@ defmodule Boxart.CodeNode do
       |> Enum.map(&Boxart.Utils.display_width/1)
       |> Enum.max(fn -> 0 end)
 
-    # gutter + separator(│) + space + code
-    width = gutter_width + 3 + max_code_width
+    # left_pad + gutter + separator(│) + space + code
+    width = gutter_width + 4 + max_code_width
 
     %CodeLabel{
       lines: lines,
@@ -90,7 +90,7 @@ defmodule Boxart.CodeNode do
 
     # Draw the gutter separator as a continuous vertical line
     {gutter_w, _} = gutter_width(code_label)
-    sep_col = content_start_x + gutter_w
+    sep_col = content_start_x + gutter_w + 1
 
     canvas = draw_gutter_separator(canvas, sep_col, y, height)
 
@@ -125,7 +125,7 @@ defmodule Boxart.CodeNode do
   end
 
   defp draw_code_line(canvas, x, row, num_str, code, sep_col) do
-    canvas = Canvas.put_text(canvas, x, row, num_str, style: "dim")
+    canvas = Canvas.put_text(canvas, x + 1, row, num_str, style: "dim")
 
     code_x = sep_col + 2
 
