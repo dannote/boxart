@@ -265,6 +265,7 @@ defmodule Boxart.Routing do
 
     simplified = Pathfinder.simplify_path(path)
     draw_path = Enum.map(simplified, fn {c, r} -> grid_to_draw_center(layout, c, r) end)
+    draw_path = deflect_from_nodes(draw_path, edge, layout)
     occupied = MapSet.new(path)
 
     %RoutedEdge{
@@ -435,6 +436,57 @@ defmodule Boxart.Routing do
       draw_path = List.insert_at(draw_path, -1, {adj_x, new_y})
       %{re | draw_path: draw_path}
     end)
+  end
+
+  # --- Draw path deflection ---
+
+  defp deflect_from_nodes(draw_path, _edge, _layout) when length(draw_path) < 2, do: draw_path
+
+  defp deflect_from_nodes(draw_path, edge, layout) do
+    node_bounds = build_node_bounds(layout, edge)
+
+    Enum.map(draw_path, fn {x, y} ->
+      case find_overlapping_node(x, y, node_bounds) do
+        nil -> {x, y}
+        {_nid, bounds} -> push_point_outside(x, y, bounds)
+      end
+    end)
+  end
+
+  defp build_node_bounds(layout, edge) do
+    layout.placements
+    |> Enum.reject(fn {nid, _p} -> nid == edge.source or nid == edge.target end)
+    |> Enum.map(fn {nid, p} ->
+      {nid,
+       %{
+         left: p.draw_x,
+         top: p.draw_y,
+         right: p.draw_x + p.draw_width - 1,
+         bottom: p.draw_y + p.draw_height - 1
+       }}
+    end)
+  end
+
+  defp find_overlapping_node(x, y, node_bounds) do
+    Enum.find(node_bounds, fn {_nid, b} ->
+      x >= b.left and x <= b.right and y >= b.top and y <= b.bottom
+    end)
+  end
+
+  defp push_point_outside(x, y, bounds) do
+    dist_left = abs(x - bounds.left)
+    dist_right = abs(x - bounds.right)
+    dist_top = abs(y - bounds.top)
+    dist_bottom = abs(y - bounds.bottom)
+
+    min_dist = Enum.min([dist_left, dist_right, dist_top, dist_bottom])
+
+    cond do
+      min_dist == dist_right or dist_right <= dist_left -> {bounds.right + 2, y}
+      min_dist == dist_left -> {bounds.left - 2, y}
+      min_dist == dist_bottom -> {x, bounds.bottom + 1}
+      true -> {x, bounds.top - 1}
+    end
   end
 
   # --- Layout delegation ---

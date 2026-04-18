@@ -239,6 +239,60 @@ defmodule Boxart.Layout.Placement do
     |> ensure_row_height(row, content_height)
   end
 
+  @doc """
+  Expand grid occupancy for nodes whose content height exceeds the
+  standard 3-row grid block. This prevents edges from routing through
+  tall nodes (e.g., code nodes with many lines).
+  """
+  @spec expand_grid_for_tall_nodes(Layout.t()) :: Layout.t()
+  def expand_grid_for_tall_nodes(%Layout{} = layout) do
+    Enum.reduce(layout.placements, layout, fn {nid, placement}, l ->
+      center_height = Map.get(l.row_heights, placement.grid.row, 1)
+      center_width = Map.get(l.col_widths, placement.grid.col, 1)
+
+      l = expand_rows(l, nid, placement, center_height)
+      expand_cols(l, nid, placement, center_width)
+    end)
+  end
+
+  defp expand_rows(layout, _nid, _placement, center_height) when center_height <= 3, do: layout
+
+  defp expand_rows(layout, nid, placement, center_height) do
+    extra_rows = div(center_height - 1, 3)
+    gc = placement.grid
+
+    Enum.reduce(1..extra_rows, layout, fn dr, l ->
+      occupied =
+        for dc <- -1..1, reduce: l.grid_occupied do
+          acc ->
+            acc
+            |> Map.put({gc.col + dc, gc.row - 1 - dr}, nid)
+            |> Map.put({gc.col + dc, gc.row + 1 + dr}, nid)
+        end
+
+      %{l | grid_occupied: occupied}
+    end)
+  end
+
+  defp expand_cols(layout, _nid, _placement, center_width) when center_width <= 10, do: layout
+
+  defp expand_cols(layout, nid, placement, center_width) do
+    extra_cols = div(center_width - 1, 8)
+    gc = placement.grid
+
+    Enum.reduce(1..extra_cols, layout, fn dc, l ->
+      occupied =
+        for dr <- -1..1, reduce: l.grid_occupied do
+          acc ->
+            acc
+            |> Map.put({gc.col - 1 - dc, gc.row + dr}, nid)
+            |> Map.put({gc.col + 1 + dc, gc.row + dr}, nid)
+        end
+
+      %{l | grid_occupied: occupied}
+    end)
+  end
+
   defp collect_grid_cells(layout) do
     Enum.reduce(layout.placements, {MapSet.new(), MapSet.new()}, fn {_nid, p}, {cols, rows} ->
       cols = for dc <- -1..1, reduce: cols, do: (acc -> MapSet.put(acc, p.grid.col + dc))
