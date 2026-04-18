@@ -286,9 +286,11 @@ defmodule Boxart.Canvas do
   Fill a horizontal span with a character from `col_start` to `col_end` (exclusive).
   """
   @spec fill_horizontal(t(), integer(), integer(), integer(), String.t()) :: t()
-  def fill_horizontal(%__MODULE__{} = canvas, row, col_start, col_end, ch) do
+  def fill_horizontal(%__MODULE__{} = canvas, row, col_start, col_end, ch, opts \\ []) do
+    style = Keyword.get(opts, :style, "")
+
     Enum.reduce(col_start..(col_end - 1)//1, canvas, fn c, acc ->
-      put(acc, c, row, ch)
+      put(acc, c, row, ch, style: style)
     end)
   end
 
