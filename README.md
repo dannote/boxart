@@ -129,10 +129,21 @@ Vertex labels are keyword lists (libgraph convention). Boxart recognizes:
 
 ## Edge labels
 
-Edge labels become the display text on the connecting edge:
+Simple string labels:
 
 ```elixir
 Graph.add_edge(g, "A", "B", label: "yes")
+```
+
+Keyword list labels for advanced edge styling:
+
+```elixir
+Graph.add_edge(g, "A", "B", label: [
+  label: "yes",         # display text
+  style: :dotted,       # :solid (default), :dotted, :thick
+  bidirectional: true,  # arrows on both ends
+  arrow: false          # no arrow (T-junction instead)
+])
 ```
 
 ## Specialized renderers

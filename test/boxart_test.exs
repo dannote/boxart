@@ -91,4 +91,40 @@ defmodule BoxartTest do
     assert String.contains?(result, "foo")
     assert String.contains?(result, "bar")
   end
+
+  test "edge keyword labels with style" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex("A")
+      |> Graph.add_vertex("B")
+      |> Graph.add_edge("A", "B", label: [label: "link", style: :dotted])
+
+    result = Boxart.render(g, direction: :lr)
+    assert String.contains?(result, "link")
+    assert String.contains?(result, "┄")
+  end
+
+  test "edge keyword labels with bidirectional" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex("A")
+      |> Graph.add_vertex("B")
+      |> Graph.add_edge("A", "B", label: [bidirectional: true])
+
+    result = Boxart.render(g, direction: :lr)
+    assert String.contains?(result, "◄")
+    assert String.contains?(result, "►")
+  end
+
+  test "edge keyword labels with no arrow" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex("A")
+      |> Graph.add_vertex("B")
+      |> Graph.add_edge("A", "B", label: [arrow: false])
+
+    result = Boxart.render(g, direction: :lr)
+    refute String.contains?(result, "►")
+    assert String.contains?(result, "┤") or String.contains?(result, "├")
+  end
 end

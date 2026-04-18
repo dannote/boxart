@@ -41,7 +41,18 @@ defmodule Boxart do
 
   ## Edge labels
 
-  Edge labels are used as the display text on the edge.
+  Simple string labels:
+
+      Graph.add_edge(g, "A", "B", label: "yes")
+
+  Keyword list labels for advanced edge styling:
+
+      Graph.add_edge(g, "A", "B", label: [
+        label: "yes",         # display text
+        style: :dotted,       # :solid (default), :dotted, :thick
+        bidirectional: true,  # arrows on both ends
+        arrow: false          # no arrow (T-junction instead)
+      ])
 
   ## Directions
 

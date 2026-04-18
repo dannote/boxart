@@ -238,11 +238,7 @@ defmodule Boxart.Graph do
     edges =
       Graph.edges(libgraph)
       |> Enum.map(fn %Graph.Edge{v1: v1, v2: v2, label: edge_lbl} ->
-        %Edge{
-          source: to_id(v1),
-          target: to_id(v2),
-          label: edge_label(edge_lbl)
-        }
+        build_edge(v1, v2, edge_lbl)
       end)
       |> Enum.sort_by(fn e ->
         si = Map.get(order_index, e.source, :infinity)
@@ -271,6 +267,26 @@ defmodule Boxart.Graph do
       {Map.get(in_deg, v, 0) - Map.get(out_deg, v, 0), to_id(v)}
     end)
     |> Enum.map(&to_id/1)
+  end
+
+  defp build_edge(v1, v2, label) when is_list(label) do
+    %Edge{
+      source: to_id(v1),
+      target: to_id(v2),
+      label: edge_label(Keyword.get(label, :label) || Keyword.get(label, :text, "")),
+      style: Keyword.get(label, :style, :solid),
+      has_arrow_start: Keyword.get(label, :bidirectional, false),
+      has_arrow_end: Keyword.get(label, :arrow, true),
+      min_length: Keyword.get(label, :min_length, 1)
+    }
+  end
+
+  defp build_edge(v1, v2, label) do
+    %Edge{
+      source: to_id(v1),
+      target: to_id(v2),
+      label: edge_label(label)
+    }
   end
 
   defp to_id(v) when is_binary(v), do: v
