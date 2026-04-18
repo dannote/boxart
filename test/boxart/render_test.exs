@@ -1,34 +1,44 @@
 defmodule Boxart.RenderTest do
   use ExUnit.Case, async: true
 
-  alias Boxart.Graph
-  alias Boxart.Graph.{Edge, Node}
-
   defp graph(direction, edges, node_overrides \\ %{}) do
-    node_ids = edges |> Enum.flat_map(fn e -> [e.source, e.target] end) |> Enum.uniq()
-    nodes = Map.new(node_ids, fn id -> {id, Map.get(node_overrides, id, Node.new(id))} end)
+    g =
+      Enum.reduce(edges, Graph.new(), fn e, acc ->
+        acc
+        |> ensure_vertex(e.source, node_overrides)
+        |> ensure_vertex(e.target, node_overrides)
+        |> Graph.add_edge(e.source, e.target, label: e.label)
+      end)
 
-    %Graph{
-      direction: direction,
-      nodes: nodes,
-      edges: edges,
-      node_order: node_ids
-    }
+    {g, direction}
+  end
+
+  defp ensure_vertex(g, id, overrides) do
+    if Graph.has_vertex?(g, id) do
+      g
+    else
+      labels = Map.get(overrides, id, [])
+      Graph.add_vertex(g, id, labels)
+    end
   end
 
   defp simple_edges(pairs) do
-    Enum.map(pairs, fn {s, t} -> %Edge{source: s, target: t} end)
+    Enum.map(pairs, fn {s, t} -> %{source: s, target: t, label: nil} end)
   end
 
   defp labeled_edges(triples) do
-    Enum.map(triples, fn {s, t, label} -> %Edge{source: s, target: t, label: label} end)
+    Enum.map(triples, fn {s, t, label} -> %{source: s, target: t, label: label} end)
+  end
+
+  defp render({g, direction}, opts \\ []) do
+    Boxart.render(g, Keyword.put_new(opts, :direction, direction))
   end
 
   describe "basic rendering" do
     test "single chain LR" do
       output =
         graph(:lr, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render()
+        |> render()
 
       for node <- ["A", "B", "C"] do
         assert String.contains?(output, node), "Node #{node} missing"
@@ -40,7 +50,7 @@ defmodule Boxart.RenderTest do
     test "single chain TD" do
       output =
         graph(:td, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render()
+        |> render()
 
       for node <- ["A", "B", "C"] do
         assert String.contains?(output, node)
@@ -52,7 +62,7 @@ defmodule Boxart.RenderTest do
     test "branching TD" do
       output =
         graph(:td, simple_edges([{"A", "B"}, {"A", "C"}]))
-        |> Boxart.render()
+        |> render()
 
       for node <- ["A", "B", "C"] do
         assert String.contains?(output, node)
@@ -62,7 +72,7 @@ defmodule Boxart.RenderTest do
     test "diamond pattern" do
       output =
         graph(:td, simple_edges([{"A", "B"}, {"A", "C"}, {"B", "D"}, {"C", "D"}]))
-        |> Boxart.render()
+        |> render()
 
       for node <- ["A", "B", "C", "D"] do
         assert String.contains?(output, node)
@@ -77,11 +87,11 @@ defmodule Boxart.RenderTest do
           :td,
           simple_edges([{"A", "B"}]),
           %{
-            "A" => Node.new("A", label: "Line 1\nLine 2"),
-            "B" => Node.new("B", label: "Target")
+            "A" => [label: "Line 1\nLine 2"],
+            "B" => [label: "Target"]
           }
         )
-        |> Boxart.render()
+        |> render()
 
       assert String.contains?(output, "Line 1")
       assert String.contains?(output, "Line 2")
@@ -93,7 +103,7 @@ defmodule Boxart.RenderTest do
     test "labeled edges show labels" do
       output =
         graph(:lr, labeled_edges([{"A", "B", "yes"}, {"A", "C", "no"}]))
-        |> Boxart.render()
+        |> render()
 
       assert String.contains?(output, "yes")
       assert String.contains?(output, "no")
@@ -104,7 +114,7 @@ defmodule Boxart.RenderTest do
     test "produces no unicode box-drawing characters" do
       output =
         graph(:lr, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render(charset: :ascii)
+        |> render(charset: :ascii)
 
       box_chars = ~c[┌┐└┘─│├┤┬┴┼╭╮╰╯►◄▲▼┄┆━┃╋]
 
@@ -122,7 +132,7 @@ defmodule Boxart.RenderTest do
     test "renders all nodes" do
       output =
         graph(:lr, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render(charset: :ascii)
+        |> render(charset: :ascii)
 
       for node <- ["A", "B", "C"] do
         assert String.contains?(output, node)
@@ -134,7 +144,7 @@ defmodule Boxart.RenderTest do
     test "valid unicode output" do
       output =
         graph(:td, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render()
+        |> render()
 
       refute String.contains?(output, "\uFFFD")
       assert output == output |> String.to_charlist() |> List.to_string()
@@ -143,7 +153,7 @@ defmodule Boxart.RenderTest do
     test "reasonable dimensions" do
       output =
         graph(:lr, simple_edges([{"A", "B"}, {"B", "C"}]))
-        |> Boxart.render()
+        |> render()
 
       lines = String.split(output, "\n")
       assert length(lines) <= 200
@@ -153,7 +163,7 @@ defmodule Boxart.RenderTest do
 
     test "all nodes appear in output" do
       edges = simple_edges([{"A", "B"}, {"A", "C"}, {"B", "D"}, {"C", "D"}, {"D", "E"}])
-      output = graph(:td, edges) |> Boxart.render()
+      output = graph(:td, edges) |> render()
 
       for node <- ["A", "B", "C", "D", "E"] do
         assert String.contains?(output, node), "Node #{node} missing from output"
@@ -164,18 +174,17 @@ defmodule Boxart.RenderTest do
   describe "gap parameter" do
     test "smaller gap produces narrower LR output" do
       edges = simple_edges([{"A", "B"}, {"B", "C"}, {"C", "D"}, {"D", "E"}])
-      g = graph(:lr, edges)
 
       w4 =
-        g
-        |> Boxart.render(gap: 4)
+        graph(:lr, edges)
+        |> render(gap: 4)
         |> String.split("\n")
         |> Enum.map(&String.length/1)
         |> Enum.max()
 
       w1 =
-        g
-        |> Boxart.render(gap: 1)
+        graph(:lr, edges)
+        |> render(gap: 1)
         |> String.split("\n")
         |> Enum.map(&String.length/1)
         |> Enum.max()
@@ -186,12 +195,12 @@ defmodule Boxart.RenderTest do
     test "gap=0 is clamped to gap=1" do
       edges = simple_edges([{"A", "B"}, {"B", "C"}])
       g = graph(:lr, edges)
-      assert Boxart.render(g, gap: 0) == Boxart.render(g, gap: 1)
+      assert render(g, gap: 0) == render(g, gap: 1)
     end
 
     test "all nodes visible with compact gap" do
       edges = simple_edges([{"A", "B"}, {"B", "C"}, {"C", "D"}, {"D", "E"}, {"E", "F"}])
-      output = graph(:lr, edges) |> Boxart.render(gap: 1)
+      output = graph(:lr, edges) |> render(gap: 1)
 
       for node <- ~w(A B C D E F) do
         assert String.contains?(output, node)
@@ -205,9 +214,9 @@ defmodule Boxart.RenderTest do
         graph(
           :td,
           simple_edges([{"A", "B"}]),
-          %{"A" => Node.new("A", label: "Q?", shape: :diamond)}
+          %{"A" => [label: "Q?", shape: :diamond]}
         )
-        |> Boxart.render()
+        |> render()
 
       assert String.contains?(output, "◇") or String.contains?(output, "/")
     end
@@ -217,9 +226,9 @@ defmodule Boxart.RenderTest do
         graph(
           :td,
           simple_edges([{"A", "B"}]),
-          %{"A" => Node.new("A", label: "Hi", shape: :rounded)}
+          %{"A" => [label: "Hi", shape: :rounded]}
         )
-        |> Boxart.render()
+        |> render()
 
       assert String.contains?(output, "╭") or String.contains?(output, "+")
     end

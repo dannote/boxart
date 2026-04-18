@@ -1,24 +1,17 @@
 defmodule BoxartTest do
   use ExUnit.Case
 
-  alias Boxart.Graph
-  alias Boxart.Graph.{Edge, Node}
-
   test "render returns empty string for empty graph" do
-    graph = %Graph{}
+    graph = Graph.new()
     assert Boxart.render(graph) == ""
   end
 
   test "render returns a string for a simple graph" do
-    graph = %Graph{
-      direction: :tb,
-      nodes: %{
-        "A" => %Node{id: "A", label: "Hello"},
-        "B" => %Node{id: "B", label: "World"}
-      },
-      edges: [%Edge{source: "A", target: "B"}],
-      node_order: ["A", "B"]
-    }
+    graph =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Hello")
+      |> Graph.add_vertex("B", label: "World")
+      |> Graph.add_edge("A", "B")
 
     result = Boxart.render(graph)
     assert is_binary(result)
@@ -27,16 +20,75 @@ defmodule BoxartTest do
   end
 
   test "render supports ascii charset" do
-    graph = %Graph{
-      direction: :tb,
-      nodes: %{"A" => %Node{id: "A", label: "Test"}},
-      edges: [],
-      node_order: ["A"]
-    }
+    graph =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Test")
 
     result = Boxart.render(graph, charset: :ascii)
     assert is_binary(result)
     assert String.contains?(result, "Test")
     refute String.contains?(result, "┌")
+  end
+
+  test "render with direction option" do
+    graph =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Start")
+      |> Graph.add_vertex("B", label: "End")
+      |> Graph.add_edge("A", "B")
+
+    lr = Boxart.render(graph, direction: :lr)
+    td = Boxart.render(graph, direction: :td)
+
+    assert String.contains?(lr, "Start")
+    assert String.contains?(td, "Start")
+    assert lr != td
+  end
+
+  test "render with node shapes" do
+    graph =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Question?", shape: :diamond)
+      |> Graph.add_vertex("B", label: "Answer")
+      |> Graph.add_edge("A", "B")
+
+    result = Boxart.render(graph)
+    assert String.contains?(result, "Question?")
+    assert String.contains?(result, "◇") or String.contains?(result, "/")
+  end
+
+  test "render with edge labels" do
+    graph =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Start")
+      |> Graph.add_vertex("B", label: "End")
+      |> Graph.add_edge("A", "B", label: "next")
+
+    result = Boxart.render(graph, direction: :td)
+    assert String.contains?(result, "next")
+  end
+
+  test "render with atom vertices" do
+    graph =
+      Graph.new()
+      |> Graph.add_vertex(:hello, label: "Hello")
+      |> Graph.add_vertex(:world, label: "World")
+      |> Graph.add_edge(:hello, :world)
+
+    result = Boxart.render(graph)
+    assert String.contains?(result, "Hello")
+    assert String.contains?(result, "World")
+  end
+
+  test "vertex without label uses inspect of vertex" do
+    graph =
+      Graph.new()
+      |> Graph.add_vertex(:foo)
+      |> Graph.add_vertex(:bar)
+      |> Graph.add_edge(:foo, :bar)
+
+    result = Boxart.render(graph)
+    assert String.contains?(result, "foo")
+    assert String.contains?(result, "bar")
   end
 end

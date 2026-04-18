@@ -2,44 +2,24 @@
 
 Terminal graph rendering with Unicode box-drawing characters.
 
-Boxart takes a directed graph and renders it as ASCII/Unicode art in the terminal,
-with multiline labels inside nodes, edge labels, and automatic layout.
-
-## Features
-
-- Sugiyama-style layered graph layout with crossing minimization
-- A\* edge routing with soft obstacle avoidance
-- Direction-aware junction merging (Canvas with bitfield tracking)
-- Unicode and ASCII rendering modes
-- Multiline node labels (code fragments, etc.)
-- Edge labels
-- Multiple node shapes (rectangle, rounded, diamond, hexagon, stadium, circle, cylinder, and more)
-- Subgraph support
-- Configurable padding and gap spacing
+Takes a `Graph.t()` from [libgraph](https://hex.pm/packages/libgraph)
+and renders it as ASCII/Unicode art in the terminal, with multiline labels
+inside nodes, edge labels, and automatic layout.
 
 ## Usage
 
 ```elixir
-alias Boxart.Graph
-alias Boxart.Graph.{Node, Edge}
+graph =
+  Graph.new()
+  |> Graph.add_vertex("A", label: "Start")
+  |> Graph.add_vertex("B", label: "Decision", shape: :diamond)
+  |> Graph.add_vertex("C", label: "Process")
+  |> Graph.add_vertex("D", label: "End")
+  |> Graph.add_edge("A", "B")
+  |> Graph.add_edge("B", "C", label: "yes")
+  |> Graph.add_edge("B", "D", label: "no")
 
-graph = %Graph{
-  direction: :td,
-  nodes: %{
-    "A" => Node.new("A", label: "Start"),
-    "B" => Node.new("B", label: "Decision", shape: :diamond),
-    "C" => Node.new("C", label: "Process"),
-    "D" => Node.new("D", label: "End")
-  },
-  edges: [
-    %Edge{source: "A", target: "B"},
-    %Edge{source: "B", target: "C", label: "yes"},
-    %Edge{source: "B", target: "D", label: "no"}
-  ],
-  node_order: ~w(A B C D)
-}
-
-IO.puts(Boxart.render(graph))
+IO.puts(Boxart.render(graph, direction: :td))
 ```
 
 ```
@@ -69,26 +49,36 @@ IO.puts(Boxart.render(graph))
 Multiline labels work naturally — useful for code fragments:
 
 ```elixir
-Node.new("block", label: "x = fetch(url)\ncase decode(x)")
+Graph.add_vertex(g, "block", label: "x = fetch(url)\ncase decode(x)")
+```
+
+## Vertex labels
+
+Vertex labels are keyword lists (libgraph convention). Boxart recognizes:
+
+- `:label` — display text inside the node (defaults to `inspect(vertex)`)
+- `:shape` — node shape atom (`:rectangle`, `:diamond`, `:rounded`, `:hexagon`,
+  `:stadium`, `:circle`, `:cylinder`, etc.)
+
+## Edge labels
+
+Edge labels become the display text on the connecting edge:
+
+```elixir
+Graph.add_edge(g, "A", "B", label: "yes")
 ```
 
 ## Options
 
 ```elixir
 Boxart.render(graph,
+  direction: :td,     # :td, :lr, :bt, :rl
   charset: :unicode,  # :unicode (default) or :ascii
   padding_x: 4,       # horizontal padding inside nodes
-  padding_y: 2,        # vertical padding inside nodes
-  gap: 4               # gap between nodes
+  padding_y: 2,       # vertical padding inside nodes
+  gap: 4              # gap between nodes
 )
 ```
-
-## Directions
-
-- `:td` / `:tb` — top to bottom (default)
-- `:lr` — left to right
-- `:bt` — bottom to top
-- `:rl` — right to left
 
 ## Installation
 

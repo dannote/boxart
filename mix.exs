@@ -47,6 +47,7 @@ defmodule Boxart.MixProject do
 
   defp deps do
     [
+      {:libgraph, "~> 0.16.0"},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false}

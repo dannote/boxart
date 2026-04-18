@@ -1,12 +1,10 @@
 defmodule Boxart.Graph do
   @moduledoc """
-  Core graph data model for diagram rendering.
+  Internal graph representation for the rendering pipeline.
 
-  Defines the primary data structures — `Graph`, `Node`, `Edge`, and `Subgraph` —
-  along with direction, edge style, and node shape enumerations.
+  Users should build graphs with `Graph` from libgraph and pass them to
+  `Boxart.render/2`. This module handles the conversion via `from_libgraph/2`.
   """
-
-  alias __MODULE__
 
   @directions [:tb, :td, :lr, :bt, :rl]
   @edge_styles [:solid, :dotted, :thick, :invisible]
@@ -92,7 +90,7 @@ defmodule Boxart.Graph do
     @type t :: %__MODULE__{
             id: String.t(),
             label: String.t(),
-            shape: Graph.node_shape()
+            shape: Boxart.Graph.node_shape()
           }
 
     @enforce_keys [:id]
@@ -118,11 +116,11 @@ defmodule Boxart.Graph do
             source: String.t(),
             target: String.t(),
             label: String.t(),
-            style: Graph.edge_style(),
+            style: Boxart.Graph.edge_style(),
             has_arrow_start: boolean(),
             has_arrow_end: boolean(),
-            arrow_type_start: Graph.arrow_type(),
-            arrow_type_end: Graph.arrow_type(),
+            arrow_type_start: Boxart.Graph.arrow_type(),
+            arrow_type_end: Boxart.Graph.arrow_type(),
             min_length: pos_integer()
           }
 
@@ -160,7 +158,7 @@ defmodule Boxart.Graph do
             label: String.t(),
             node_ids: [String.t()],
             children: [t()],
-            direction: Graph.direction() | nil,
+            direction: Boxart.Graph.direction() | nil,
             parent: t() | nil
           }
 
@@ -181,13 +179,92 @@ defmodule Boxart.Graph do
   defstruct direction: :tb, nodes: %{}, edges: [], node_order: [], subgraphs: []
 
   @doc """
+  Converts a libgraph `Graph.t()` into the internal representation.
+
+  Vertex labels are keyword lists. Recognized keys:
+
+    * `:label` — display text (defaults to `inspect(vertex)`)
+    * `:shape` — node shape atom (default: `:rectangle`)
+
+  Edge labels become the display text on the edge.
+
+  ## Options
+
+    * `:direction` — layout direction (default: `:td`)
+  """
+  @spec from_libgraph(Graph.t(), keyword()) :: t()
+  def from_libgraph(%Graph{} = libgraph, opts \\ []) do
+    direction = Keyword.get(opts, :direction, :td)
+    vertices = Graph.vertices(libgraph)
+
+    nodes =
+      Map.new(vertices, fn v ->
+        id = to_id(v)
+        labels = Graph.vertex_labels(libgraph, v)
+        label = label_from_vertex(v, labels)
+        shape = shape_from_labels(labels)
+        {id, %Node{id: id, label: label, shape: shape}}
+      end)
+
+    node_order = Enum.map(vertices, &to_id/1)
+
+    edges =
+      Graph.edges(libgraph)
+      |> Enum.map(fn %Graph.Edge{v1: v1, v2: v2, label: edge_lbl} ->
+        %Edge{
+          source: to_id(v1),
+          target: to_id(v2),
+          label: edge_label(edge_lbl)
+        }
+      end)
+
+    %__MODULE__{
+      direction: direction,
+      nodes: nodes,
+      edges: edges,
+      node_order: node_order
+    }
+  end
+
+  defp to_id(v) when is_binary(v), do: v
+  defp to_id(v) when is_atom(v), do: Atom.to_string(v)
+  defp to_id(v), do: inspect(v)
+
+  defp label_from_vertex(vertex, labels) do
+    case find_label_value(labels, :label) do
+      nil -> to_id(vertex)
+      val -> to_string(val)
+    end
+  end
+
+  defp shape_from_labels(labels) do
+    case find_label_value(labels, :shape) do
+      nil -> :rectangle
+      shape when is_atom(shape) -> shape
+      _ -> :rectangle
+    end
+  end
+
+  defp find_label_value(labels, key) do
+    Enum.find_value(labels, fn
+      {^key, val} -> val
+      kw when is_list(kw) -> Keyword.get(kw, key)
+      _ -> nil
+    end)
+  end
+
+  defp edge_label(nil), do: ""
+  defp edge_label(label) when is_binary(label), do: label
+  defp edge_label(label), do: inspect(label)
+
+  @doc """
   Adds a node to the graph.
 
   If a node with the same id already exists, merges non-default fields
   from the new node into the existing one.
   """
   @spec add_node(t(), Node.t()) :: t()
-  def add_node(%Graph{nodes: nodes, node_order: order} = graph, %Node{id: id} = node) do
+  def add_node(%__MODULE__{nodes: nodes, node_order: order} = graph, %Node{id: id} = node) do
     case Map.fetch(nodes, id) do
       :error ->
         %{graph | nodes: Map.put(nodes, id, node), node_order: order ++ [id]}
@@ -210,7 +287,7 @@ defmodule Boxart.Graph do
 
   @doc "Appends an edge to the graph."
   @spec add_edge(t(), Edge.t()) :: t()
-  def add_edge(%Graph{edges: edges} = graph, %Edge{} = edge) do
+  def add_edge(%__MODULE__{edges: edges} = graph, %Edge{} = edge) do
     %{graph | edges: edges ++ [edge]}
   end
 
@@ -220,7 +297,7 @@ defmodule Boxart.Graph do
   Falls back to the first defined node when every node has incoming edges.
   """
   @spec get_roots(t()) :: [String.t()]
-  def get_roots(%Graph{edges: edges, node_order: order}) do
+  def get_roots(%__MODULE__{edges: edges, node_order: order}) do
     targets = MapSet.new(edges, & &1.target)
     roots = Enum.filter(order, &(&1 not in targets))
 
@@ -232,7 +309,7 @@ defmodule Boxart.Graph do
 
   @doc "Returns ids of nodes reachable via outgoing edges from `node_id`, in edge order."
   @spec get_children(t(), String.t()) :: [String.t()]
-  def get_children(%Graph{edges: edges}, node_id) do
+  def get_children(%__MODULE__{edges: edges}, node_id) do
     edges
     |> Enum.reduce({[], MapSet.new()}, fn
       %Edge{source: ^node_id, target: target}, {children, seen} when target != node_id ->
@@ -249,13 +326,13 @@ defmodule Boxart.Graph do
 
   @doc "Finds a subgraph by its id, searching recursively through nested children."
   @spec find_subgraph_by_id(t(), String.t()) :: Subgraph.t() | nil
-  def find_subgraph_by_id(%Graph{subgraphs: subgraphs}, sg_id) do
+  def find_subgraph_by_id(%__MODULE__{subgraphs: subgraphs}, sg_id) do
     search_subgraphs(subgraphs, &(&1.id == sg_id))
   end
 
   @doc "Finds the innermost subgraph containing `node_id`."
   @spec find_subgraph_for_node(t(), String.t()) :: Subgraph.t() | nil
-  def find_subgraph_for_node(%Graph{subgraphs: subgraphs}, node_id) do
+  def find_subgraph_for_node(%__MODULE__{subgraphs: subgraphs}, node_id) do
     search_subgraphs_deepest(subgraphs, node_id)
   end
 
