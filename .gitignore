@@ -21,3 +21,19 @@ boxart-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Dialyzer PLT files
+/priv/plts/
+_build/dev/dialyxir*.plt
+_build/dev/dialyxir*.plt.hash
+
+# Editor/IDE
+.elixir_ls/
+.vscode/
+*.swp
+*~
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
