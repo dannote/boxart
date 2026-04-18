@@ -1,7 +1,7 @@
 defmodule Boxart.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
   @source_url "https://github.com/dannote/boxart"
 
   def project do
@@ -59,7 +59,7 @@ defmodule Boxart.MixProject do
   defp docs do
     [
       main: "Boxart",
-      extras: ["README.md", "LICENSE"],
+      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
       source_url: @source_url,
       source_ref: "master",
       groups_for_modules: [
@@ -96,7 +96,7 @@ defmodule Boxart.MixProject do
     [
       licenses: ["MIT"],
       links: %{"GitHub" => @source_url},
-      files: ~w(lib mix.exs README.md LICENSE .formatter.exs)
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE .formatter.exs)
     ]
   end
 end
