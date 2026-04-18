@@ -330,7 +330,7 @@ defmodule Boxart.Canvas do
 
   @doc """
   Render canvas to a string, trimming trailing whitespace per line
-  and removing trailing empty lines.
+  and removing both leading and trailing empty lines.
   """
   @spec render(t()) :: String.t()
   def render(%__MODULE__{} = canvas) do
@@ -340,6 +340,7 @@ defmodule Boxart.Canvas do
       |> Enum.map_join(fn c -> cell_char(canvas, c, r) end)
       |> String.trim_trailing()
     end)
+    |> Enum.drop_while(&(&1 == ""))
     |> Enum.reverse()
     |> Enum.drop_while(&(&1 == ""))
     |> Enum.reverse()

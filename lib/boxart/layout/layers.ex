@@ -95,7 +95,16 @@ defmodule Boxart.Layout.Layers do
     {node_layer, node_pos} = build_layer_pos_lookup(layer_order)
 
     graph.edges
-    |> Enum.reject(&Edge.self_reference?(&1))
+    |> Enum.reject(fn edge ->
+      src_layer = Map.get(node_layer, edge.source)
+      tgt_layer = Map.get(node_layer, edge.target)
+
+      cond do
+        Edge.self_reference?(edge) -> true
+        is_integer(src_layer) and is_integer(tgt_layer) and tgt_layer < src_layer -> true
+        true -> false
+      end
+    end)
     |> Enum.reduce(%{}, &accumulate_gap_crossings(&1, &2, node_layer, node_pos))
     |> Map.new(fn {gap, n} -> {gap, max(0, n - 1)} end)
     |> Enum.reject(fn {_gap, extra} -> extra == 0 end)

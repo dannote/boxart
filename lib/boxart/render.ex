@@ -61,13 +61,13 @@ defmodule Boxart.Render do
     routed = Routing.route_edges(graph, layout)
 
     canvas = create_canvas(layout, routed)
+    {layout, routed} = mirror_coordinates(layout, routed, canvas, needs_v_flip, needs_h_flip)
 
     canvas
     |> draw_subgraph_borders(layout, cs)
     |> draw_nodes(graph, layout, cs)
     |> draw_edges(graph, routed, cs)
     |> draw_subgraph_labels(graph, layout)
-    |> maybe_flip(needs_v_flip, needs_h_flip)
   end
 
   # -- Direction normalization --
@@ -82,9 +82,77 @@ defmodule Boxart.Render do
 
   defp normalize_direction(graph), do: {graph, false, false}
 
-  defp maybe_flip(canvas, true, false), do: Canvas.flip_vertical(canvas)
-  defp maybe_flip(canvas, false, true), do: Canvas.flip_horizontal(canvas)
-  defp maybe_flip(canvas, _v, _h), do: canvas
+  defp mirror_coordinates(layout, routed, _canvas, false, false), do: {layout, routed}
+
+  defp mirror_coordinates(layout, routed, canvas, needs_v_flip, needs_h_flip) do
+    w = canvas.width
+    h = canvas.height
+
+    mirrored_placements =
+      Map.new(layout.placements, fn {nid, p} ->
+        {nid, mirror_placement(p, w, h, needs_h_flip, needs_v_flip)}
+      end)
+
+    mirrored_subgraph_bounds =
+      Enum.map(
+        layout.subgraph_bounds,
+        &mirror_subgraph_bound(&1, w, h, needs_h_flip, needs_v_flip)
+      )
+
+    mirrored_routed =
+      Enum.map(routed, fn re ->
+        mirrored_path =
+          Enum.map(re.draw_path, &mirror_point(&1, w, h, needs_h_flip, needs_v_flip))
+
+        %{re | draw_path: mirrored_path}
+      end)
+
+    layout = %{
+      layout
+      | placements: mirrored_placements,
+        subgraph_bounds: mirrored_subgraph_bounds
+    }
+
+    {layout, mirrored_routed}
+  end
+
+  defp mirror_placement(p, w, _h, true = _needs_h_flip, false = _needs_v_flip) do
+    %{p | draw_x: w - p.draw_x - p.draw_width}
+  end
+
+  defp mirror_placement(p, _w, h, false = _needs_h_flip, true = _needs_v_flip) do
+    %{p | draw_y: h - p.draw_y - p.draw_height}
+  end
+
+  defp mirror_placement(p, w, h, true = _needs_h_flip, true = _needs_v_flip) do
+    p = %{p | draw_x: w - p.draw_x - p.draw_width}
+    %{p | draw_y: h - p.draw_y - p.draw_height}
+  end
+
+  defp mirror_subgraph_bound(sb, w, _h, true = _needs_h_flip, false = _needs_v_flip) do
+    %{sb | x: w - sb.x - sb.width}
+  end
+
+  defp mirror_subgraph_bound(sb, _w, h, false = _needs_h_flip, true = _needs_v_flip) do
+    %{sb | y: h - sb.y - sb.height}
+  end
+
+  defp mirror_subgraph_bound(sb, w, h, true = _needs_h_flip, true = _needs_v_flip) do
+    sb = %{sb | x: w - sb.x - sb.width}
+    %{sb | y: h - sb.y - sb.height}
+  end
+
+  defp mirror_point({x, y}, w, _h, true = _needs_h_flip, false = _needs_v_flip) do
+    {w - 1 - x, y}
+  end
+
+  defp mirror_point({x, y}, _w, h, false = _needs_h_flip, true = _needs_v_flip) do
+    {x, h - 1 - y}
+  end
+
+  defp mirror_point({x, y}, w, h, true = _needs_h_flip, true = _needs_v_flip) do
+    {w - 1 - x, h - 1 - y}
+  end
 
   # -- Canvas creation --
 
