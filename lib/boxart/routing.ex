@@ -89,7 +89,10 @@ defmodule Boxart.Routing do
       end)
 
     routed = Enum.reverse(routed)
-    spread_shared_endpoints(routed, layout)
+
+    routed
+    |> spread_shared_endpoints(layout)
+    |> deflect_all_from_nodes(layout)
   end
 
   # --- Direction helpers ---
@@ -265,7 +268,6 @@ defmodule Boxart.Routing do
 
     simplified = Pathfinder.simplify_path(path)
     draw_path = Enum.map(simplified, fn {c, r} -> grid_to_draw_center(layout, c, r) end)
-    draw_path = deflect_from_nodes(draw_path, edge, layout)
     occupied = MapSet.new(path)
 
     %RoutedEdge{
@@ -438,54 +440,68 @@ defmodule Boxart.Routing do
     end)
   end
 
+  defp deflect_all_from_nodes(routed, layout) do
+    Enum.map(routed, fn re ->
+      %{re | draw_path: deflect_from_nodes(re.draw_path, re.edge, layout)}
+    end)
+  end
+
   # --- Draw path deflection ---
 
   defp deflect_from_nodes(draw_path, _edge, _layout) when length(draw_path) < 2, do: draw_path
 
   defp deflect_from_nodes(draw_path, edge, layout) do
-    node_bounds = build_node_bounds(layout, edge)
+    # Build bounds for non-source/target nodes (intermediate obstacles)
+    # AND for the target node (edges shouldn't pass through it either,
+    # except at the actual endpoint)
+    obstacle_bounds =
+      layout.placements
+      |> Enum.reject(fn {nid, _} -> nid == edge.source end)
+      |> Enum.map(fn {_nid, p} ->
+        %{
+          left: p.draw_x,
+          top: p.draw_y,
+          right: p.draw_x + p.draw_width - 1,
+          bottom: p.draw_y + p.draw_height - 1
+        }
+      end)
 
-    Enum.map(draw_path, fn {x, y} ->
-      case find_overlapping_node(x, y, node_bounds) do
-        nil -> {x, y}
-        {_nid, bounds} -> push_point_outside(x, y, bounds)
-      end
+    # Only deflect intermediate points, never the first or last
+    path_len = length(draw_path)
+
+    draw_path
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {{x, y}, 0} -> {x, y}
+      {{x, y}, idx} when idx == path_len - 1 -> {x, y}
+      {{x, y}, _idx} -> deflect_point(x, y, obstacle_bounds)
     end)
   end
 
-  defp build_node_bounds(layout, edge) do
-    layout.placements
-    |> Enum.reject(fn {nid, _p} -> nid == edge.source or nid == edge.target end)
-    |> Enum.map(fn {nid, p} ->
-      {nid,
-       %{
-         left: p.draw_x,
-         top: p.draw_y,
-         right: p.draw_x + p.draw_width - 1,
-         bottom: p.draw_y + p.draw_height - 1
-       }}
-    end)
+  defp deflect_point(x, y, bounds) do
+    case Enum.find(bounds, &point_inside?(x, y, &1)) do
+      nil -> {x, y}
+      b -> push_outside(x, y, b)
+    end
   end
 
-  defp find_overlapping_node(x, y, node_bounds) do
-    Enum.find(node_bounds, fn {_nid, b} ->
-      x >= b.left and x <= b.right and y >= b.top and y <= b.bottom
-    end)
+  defp point_inside?(x, y, b) do
+    x >= b.left and x <= b.right and y >= b.top and y <= b.bottom
   end
 
-  defp push_point_outside(x, y, bounds) do
-    dist_left = abs(x - bounds.left)
-    dist_right = abs(x - bounds.right)
-    dist_top = abs(y - bounds.top)
-    dist_bottom = abs(y - bounds.bottom)
-
-    min_dist = Enum.min([dist_left, dist_right, dist_top, dist_bottom])
+  defp push_outside(x, y, b) do
+    # Push to the nearest edge + 2 margin
+    dist_r = abs(x - b.right)
+    dist_l = abs(x - b.left)
+    dist_b = abs(y - b.bottom)
+    dist_t = abs(y - b.top)
+    min_d = Enum.min([dist_r, dist_l, dist_b, dist_t])
 
     cond do
-      min_dist == dist_right or dist_right <= dist_left -> {bounds.right + 2, y}
-      min_dist == dist_left -> {bounds.left - 2, y}
-      min_dist == dist_bottom -> {x, bounds.bottom + 1}
-      true -> {x, bounds.top - 1}
+      min_d == dist_r -> {b.right + 2, y}
+      min_d == dist_l -> {b.left - 2, y}
+      min_d == dist_b -> {x, b.bottom + 2}
+      true -> {x, b.top - 2}
     end
   end
 
