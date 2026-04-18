@@ -43,8 +43,49 @@ defmodule Boxart.Render do
 
       canvas ->
         max_width = Keyword.get(opts, :max_width)
-        canvas = if max_width, do: Canvas.clamp_width(canvas, max_width), else: canvas
+
+        canvas =
+          if max_width && canvas.width > max_width do
+            try_reflow(graph, opts, max_width, canvas)
+          else
+            canvas
+          end
+
         render_canvas_to_string(canvas, opts)
+    end
+  end
+
+  defp try_reflow(graph, opts, max_width, original_canvas) do
+    # Try flipping direction: TD->LR puts siblings vertically
+    flipped_dir =
+      case graph.direction do
+        dir when dir in [:td, :tb] -> :lr
+        dir when dir in [:lr] -> :td
+        _ -> nil
+      end
+
+    if flipped_dir do
+      flipped_graph = %{graph | direction: flipped_dir}
+      flipped_opts = Keyword.delete(opts, :max_width)
+
+      case render_graph_canvas(flipped_graph, flipped_opts) do
+        nil ->
+          Canvas.clamp_width(original_canvas, max_width)
+
+        flipped_canvas ->
+          if flipped_canvas.width <= max_width do
+            flipped_canvas
+          else
+            # Neither direction fits — use whichever is narrower, clamped
+            if flipped_canvas.width < original_canvas.width do
+              Canvas.clamp_width(flipped_canvas, max_width)
+            else
+              Canvas.clamp_width(original_canvas, max_width)
+            end
+          end
+      end
+    else
+      Canvas.clamp_width(original_canvas, max_width)
     end
   end
 
