@@ -146,7 +146,7 @@ defmodule Boxart.CodeNode do
   defp split_segments_into_lines(segments) do
     {lines, current} =
       Enum.reduce(segments, {[], []}, fn {text, style}, {finished, current} ->
-        parts = String.split(text, "\n", parts: :infinity)
+        parts = String.split(text, "\n")
 
         case parts do
           [single] ->

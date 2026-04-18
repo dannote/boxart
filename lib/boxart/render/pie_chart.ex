@@ -53,7 +53,7 @@ defmodule Boxart.Render.PieChart do
       chart.slices |> Enum.map(fn {l, _} -> Utils.display_width(l) end) |> Enum.max()
 
     suffixes = compute_suffixes(chart)
-    max_suffix_len = suffixes |> Enum.map(&String.length/1) |> Enum.max()
+    max_suffix_len = suffixes |> Enum.map(&Utils.display_width/1) |> Enum.max()
 
     bar_left = max_label_len + @margin
     canvas_w = bar_left + @bar_width + max_suffix_len + @margin

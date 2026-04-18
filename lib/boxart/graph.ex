@@ -89,6 +89,8 @@ defmodule Boxart.Graph do
 
     @type t :: %__MODULE__{
             id: String.t(),
+            source: String.t() | nil,
+            language: atom() | nil,
             label: String.t(),
             shape: Boxart.Graph.node_shape(),
             source: String.t() | nil,
@@ -298,6 +300,9 @@ defmodule Boxart.Graph do
     end
   end
 
+  # Label detection heuristic: if new.label == new.id, it's the default
+  # (user didn't specify a label). This can't distinguish a user-provided
+  # label that happens to equal the id — a known libgraph limitation.
   defp merge_node(existing, new) do
     label =
       if new.label != new.id and existing.label == existing.id,

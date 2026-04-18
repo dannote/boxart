@@ -111,13 +111,13 @@ defmodule Boxart.Layout do
 
   @doc "Check if a grid cell is not occupied, optionally excluding certain node IDs."
   @spec free?(t(), integer(), integer(), MapSet.t() | nil) :: boolean()
+  def free?(layout, col, row, exclude \\ nil)
   def free?(_layout, col, row, _exclude) when col < 0 or row < 0, do: false
 
   def free?(%__MODULE__{grid_occupied: occupied}, col, row, exclude) do
     case Map.get(occupied, {col, row}) do
       nil -> true
-      id when is_struct(exclude, MapSet) -> MapSet.member?(exclude, id)
-      _id -> false
+      id -> exclude != nil and MapSet.member?(exclude, id)
     end
   end
 

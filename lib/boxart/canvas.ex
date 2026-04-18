@@ -363,6 +363,8 @@ defmodule Boxart.Canvas do
   Flip the canvas vertically (for BT direction).
   """
   @spec flip_vertical(t()) :: t()
+  def flip_vertical(%__MODULE__{height: h} = canvas) when h <= 0, do: canvas
+
   def flip_vertical(%__MODULE__{height: h} = canvas) do
     flip_map = %{
       "┌" => "└",
@@ -404,6 +406,8 @@ defmodule Boxart.Canvas do
   Flip the canvas horizontally (for RL direction).
   """
   @spec flip_horizontal(t()) :: t()
+  def flip_horizontal(%__MODULE__{width: w} = canvas) when w <= 0, do: canvas
+
   def flip_horizontal(%__MODULE__{width: w} = canvas) do
     flip_map = %{
       "┌" => "┐",
@@ -526,14 +530,7 @@ defmodule Boxart.Canvas do
     flipped
   end
 
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x1100..0x115F, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x2E80..0x33BF, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x3400..0x9FFF, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xF900..0xFAFF, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFE30..0xFE6F, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFF01..0xFF60, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0xFFE0..0xFFE6, do: true
-  defp wide_char?(<<cp::utf8, _::binary>>) when cp in 0x20000..0x3FFFF, do: true
+  defp wide_char?(<<cp::utf8, _::binary>>), do: :unicode_util.is_wide(cp)
   defp wide_char?(_), do: false
 
   defimpl String.Chars do

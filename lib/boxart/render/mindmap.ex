@@ -130,7 +130,7 @@ defmodule Boxart.Render.Mindmap do
     {child_block, child_conn} = stack_right(node.children, ch)
 
     connector = node.label <> " " <> ch.h <> ch.h
-    pad = String.duplicate(" ", String.length(connector))
+    pad = String.duplicate(" ", Utils.display_width(connector))
 
     result =
       child_block
@@ -202,7 +202,7 @@ defmodule Boxart.Render.Mindmap do
     child_block = Enum.map(child_block, &rjust(&1, child_width))
 
     connector = ch.h <> ch.h <> " " <> node.label
-    pad = String.duplicate(" ", String.length(connector))
+    pad = String.duplicate(" ", Utils.display_width(connector))
 
     result =
       child_block
@@ -337,7 +337,7 @@ defmodule Boxart.Render.Mindmap do
     root_row = div(total, 2)
 
     root_part = ch.h <> ch.h <> " " <> root_label <> " " <> ch.h <> ch.h
-    pad = String.duplicate(" ", String.length(root_part))
+    pad = String.duplicate(" ", Utils.display_width(root_part))
 
     Enum.map(0..(total - 1)//1, fn row ->
       left = left_line(left_block, row - l_off, lh, left_width)
@@ -359,13 +359,7 @@ defmodule Boxart.Render.Mindmap do
     Enum.reduce(lines, 0, fn l, acc -> max(acc, Utils.display_width(l)) end)
   end
 
-  defp rjust(str, width) do
-    w = Utils.display_width(str)
-    if w < width, do: String.duplicate(" ", width - w) <> str, else: str
-  end
+  defdelegate rjust(str, width), to: Utils
 
-  defp ljust(str, width) do
-    w = Utils.display_width(str)
-    if w < width, do: str <> String.duplicate(" ", width - w), else: str
-  end
+  defdelegate ljust(str, width), to: Utils
 end

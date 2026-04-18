@@ -272,10 +272,10 @@ defmodule Boxart.Render.Shapes do
 
     canvas
     |> Canvas.put(x + 1, y, "/")
-    |> fill_horizontal(y, x + 2, x + width - 2, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y, x + 2, x + width - 2, cs.box.horizontal)
     |> Canvas.put(x + width - 2, y, "\\")
     |> Canvas.put(x + 1, y + height - 1, "\\")
-    |> fill_horizontal(y + height - 1, x + 2, x + width - 2, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + height - 1, x + 2, x + width - 2, cs.box.horizontal)
     |> Canvas.put(x + width - 2, y + height - 1, "/")
     |> draw_sides(x, y, width, height, side_char, side_char)
     |> draw_label(x, y, width, height, label)
@@ -327,10 +327,10 @@ defmodule Boxart.Render.Shapes do
     if width > 4 and height > 2 do
       canvas
       |> Canvas.put(x + 1, y + 1, cs.box.round_top_left)
-      |> fill_horizontal(y + 1, x + 2, x + width - 2, cs.box.horizontal)
+      |> Canvas.fill_horizontal(y + 1, x + 2, x + width - 2, cs.box.horizontal)
       |> Canvas.put(x + width - 2, y + 1, cs.box.round_top_right)
       |> Canvas.put(x + 1, y + height - 2, cs.box.round_bottom_left)
-      |> fill_horizontal(y + height - 2, x + 2, x + width - 2, cs.box.horizontal)
+      |> Canvas.fill_horizontal(y + height - 2, x + 2, x + width - 2, cs.box.horizontal)
       |> Canvas.put(x + width - 2, y + height - 2, cs.box.round_bottom_right)
     else
       canvas
@@ -369,8 +369,8 @@ defmodule Boxart.Render.Shapes do
     |> Canvas.put(x + width - 1, y, cs.box.top_right)
     |> Canvas.put(x + width - 1, y + height - 1, cs.box.bottom_right)
     |> draw_right_side(x, y, width, height, cs.box.vertical)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> draw_label(x, y, width, height, label)
   end
 
@@ -396,17 +396,17 @@ defmodule Boxart.Render.Shapes do
     canvas
     # Top ellipse
     |> Canvas.put(x, y, cs.box.round_top_left)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y, cs.box.round_top_right)
     # Second row (bottom of top ellipse)
     |> Canvas.put(x, y + 1, cs.box.round_bottom_left)
-    |> fill_horizontal(y + 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + 1, cs.box.round_bottom_right)
     # Body sides
     |> draw_sides_range(x, width, y + 2, y + height - 1, cs.box.vertical)
     # Bottom ellipse
     |> Canvas.put(x, y + height - 1, cs.box.round_bottom_left)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + height - 1, cs.box.round_bottom_right)
     |> draw_label(x, y, width, height, label)
   end
@@ -564,14 +564,14 @@ defmodule Boxart.Render.Shapes do
   defp draw_top_border(canvas, x, y, width, left_corner, right_corner, cs) do
     canvas
     |> Canvas.put(x, y, left_corner)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y, right_corner)
   end
 
   defp draw_bottom_border(canvas, x, y, width, height, left_corner, right_corner, cs) do
     canvas
     |> Canvas.put(x, y + height - 1, left_corner)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + height - 1, right_corner)
   end
 
@@ -599,17 +599,13 @@ defmodule Boxart.Render.Shapes do
 
   defp draw_sides_range(canvas, _x, _width, _row_start, _row_end, _ch), do: canvas
 
-  defp fill_horizontal(canvas, row, col_start, col_end, ch) do
-    Canvas.fill_horizontal(canvas, row, col_start, col_end, ch)
-  end
-
   defp draw_slanted_box(canvas, x, y, width, height, {tl, tr, bl, br}, cs) do
     canvas
     |> Canvas.put(x, y, tl)
-    |> fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y, tr)
     |> Canvas.put(x, y + height - 1, bl)
-    |> fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
+    |> Canvas.fill_horizontal(y + height - 1, x + 1, x + width - 1, cs.box.horizontal)
     |> Canvas.put(x + width - 1, y + height - 1, br)
     |> draw_sides(x, y, width, height, cs.box.vertical, cs.box.vertical)
   end

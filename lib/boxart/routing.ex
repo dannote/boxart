@@ -99,7 +99,7 @@ defmodule Boxart.Routing do
   # --- Subgraph bounds ---
 
   defp build_subgraph_bounds(layout) do
-    (Map.get(layout, :subgraph_bounds, []) || [])
+    Map.get(layout, :subgraph_bounds, [])
     |> Enum.reduce(%{}, fn sb, acc ->
       Map.put(acc, sb.subgraph.id, sb)
     end)
@@ -253,7 +253,14 @@ defmodule Boxart.Routing do
         soft_obstacles: soft_obstacles
       )
 
-    {path, start_dir, end_dir} = pick_path(path_pref, path_alt, preferred, alt)
+    {path, start_dir, end_dir} =
+      pick_path(
+        path_pref,
+        path_alt,
+        preferred,
+        alt,
+        {start_pref_col, start_pref_row, end_pref_col, end_pref_row}
+      )
 
     simplified = Pathfinder.simplify_path(path)
     draw_path = Enum.map(simplified, fn {c, r} -> grid_to_draw_center(layout, c, r) end)
@@ -270,11 +277,11 @@ defmodule Boxart.Routing do
     }
   end
 
-  defp pick_path(path_pref, path_alt, preferred, alt) do
+  defp pick_path(path_pref, path_alt, preferred, alt, fallback_coords) do
     case {path_pref, path_alt} do
       {nil, nil} ->
-        # Fallback: direct line from preferred endpoints
-        {[{0, 0}, {0, 0}], elem(preferred, 0), elem(preferred, 1)}
+        {sc, sr, ec, er} = fallback_coords || {0, 0, 0, 0}
+        {[{sc, sr}, {ec, er}], elem(preferred, 0), elem(preferred, 1)}
 
       {nil, path_alt} ->
         {path_alt, elem(alt, 0), elem(alt, 1)}

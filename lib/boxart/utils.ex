@@ -17,4 +17,18 @@ defmodule Boxart.Utils do
       if :unicode_util.is_wide(cp), do: w + 2, else: w + 1
     end)
   end
+
+  @doc false
+  @spec rjust(String.t(), non_neg_integer()) :: String.t()
+  def rjust(str, width) do
+    pad = max(width - display_width(str), 0)
+    String.duplicate(" ", pad) <> str
+  end
+
+  @doc false
+  @spec ljust(String.t(), non_neg_integer()) :: String.t()
+  def ljust(str, width) do
+    pad = max(width - display_width(str), 0)
+    str <> String.duplicate(" ", pad)
+  end
 end

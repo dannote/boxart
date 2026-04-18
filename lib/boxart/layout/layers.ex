@@ -341,22 +341,26 @@ defmodule Boxart.Layout.Layers do
   end
 
   defp topological_sort(sg_ids, succs, in_deg) do
-    queue = Enum.filter(sg_ids, &(in_deg[&1] == 0))
+    queue =
+      sg_ids
+      |> Enum.filter(&(in_deg[&1] == 0))
+      |> Enum.reduce(:queue.new(), &:queue.in(&1, &2))
+
     do_topo_sort(queue, succs, in_deg, [])
   end
 
-  defp do_topo_sort([], _succs, _in_deg, result), do: Enum.reverse(result)
+  defp do_topo_sort(queue, succs, in_deg, result) do
+    case :queue.out(queue) do
+      {:empty, _} -> Enum.reverse(result)
+      {{:value, node}, rest} -> topo_step(node, rest, succs, in_deg, result)
+    end
+  end
 
-  defp do_topo_sort([node | rest], succs, in_deg, result) do
+  defp topo_step(node, queue, succs, in_deg, result) do
     {new_queue, in_deg} =
-      Enum.reduce(succs[node], {rest, in_deg}, fn succ, {q, d} ->
+      Enum.reduce(succs[node], {queue, in_deg}, fn succ, {q, d} ->
         d = Map.update!(d, succ, &(&1 - 1))
-
-        if d[succ] == 0 do
-          {q ++ [succ], d}
-        else
-          {q, d}
-        end
+        if d[succ] == 0, do: {:queue.in(succ, q), d}, else: {q, d}
       end)
 
     do_topo_sort(new_queue, succs, in_deg, [node | result])
@@ -619,17 +623,26 @@ defmodule Boxart.Layout.Layers do
         {n, deg}
       end)
 
-    queue = Enum.filter(ordered, &(in_degree[&1] == 0))
+    queue =
+      ordered
+      |> Enum.filter(&(in_degree[&1] == 0))
+      |> Enum.reduce(:queue.new(), &:queue.in(&1, &2))
+
     do_kahn(queue, successors, in_degree, [])
   end
 
-  defp do_kahn([], _succs, _deg, result), do: Enum.reverse(result)
+  defp do_kahn(queue, succs, deg, result) do
+    case :queue.out(queue) do
+      {:empty, _} -> Enum.reverse(result)
+      {{:value, node}, rest} -> kahn_step(node, rest, succs, deg, result)
+    end
+  end
 
-  defp do_kahn([node | rest], succs, deg, result) do
+  defp kahn_step(node, queue, succs, deg, result) do
     {new_queue, deg} =
-      Enum.reduce(succs[node], {rest, deg}, fn s, {q, d} ->
+      Enum.reduce(succs[node], {queue, deg}, fn s, {q, d} ->
         d = Map.update!(d, s, &(&1 - 1))
-        if d[s] == 0, do: {q ++ [s], d}, else: {q, d}
+        if d[s] == 0, do: {:queue.in(s, q), d}, else: {q, d}
       end)
 
     do_kahn(new_queue, succs, deg, [node | result])
