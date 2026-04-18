@@ -343,6 +343,19 @@ defmodule Boxart.Canvas do
   end
 
   @doc """
+  Clamp canvas to a maximum width. Cells beyond `max_col` are dropped.
+  """
+  @spec clamp_width(t(), pos_integer()) :: t()
+  def clamp_width(%__MODULE__{} = canvas, max_col) when max_col > 0 do
+    clamped_cells =
+      canvas.cells
+      |> Enum.reject(fn {{col, _row}, _cell} -> col >= max_col end)
+      |> Map.new()
+
+    %{canvas | cells: clamped_cells, width: min(canvas.width, max_col)}
+  end
+
+  @doc """
   Render canvas to a string, trimming trailing whitespace per line
   and removing both leading and trailing empty lines.
   """

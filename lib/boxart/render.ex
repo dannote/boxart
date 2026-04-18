@@ -37,29 +37,14 @@ defmodule Boxart.Render do
   """
   @spec render_graph(BGraph.t(), render_opts()) :: String.t()
   def render_graph(graph, opts \\ []) do
-    max_width = Keyword.get(opts, :max_width)
-
     case render_graph_canvas(graph, opts) do
       nil ->
         ""
 
       canvas ->
-        output = render_canvas_to_string(canvas, opts)
-        apply_max_width(output, max_width, graph, opts)
-    end
-  end
-
-  defp apply_max_width(output, nil, _graph, _opts), do: output
-
-  defp apply_max_width(output, max_width, graph, opts) do
-    actual = output |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
-
-    if actual <= max_width do
-      output
-    else
-      shrunk = try_shrink_labels(graph, opts, max_width)
-
-      clamp_width(shrunk, max_width)
+        max_width = Keyword.get(opts, :max_width)
+        canvas = if max_width, do: Canvas.clamp_width(canvas, max_width), else: canvas
+        render_canvas_to_string(canvas, opts)
     end
   end
 
@@ -74,54 +59,6 @@ defmodule Boxart.Render do
       %Boxart.Theme{} = theme ->
         Canvas.render_ansi(canvas, theme)
     end
-  end
-
-  defp try_shrink_labels(graph, opts, max_width) do
-    current_mlw = Keyword.get(opts, :max_label_width, 20)
-    min_mlw = 6
-
-    shrunk_mlw = find_fitting_label_width(graph, opts, max_width, current_mlw, min_mlw)
-    new_opts = Keyword.put(opts, :max_label_width, shrunk_mlw)
-
-    case render_graph_canvas(graph, new_opts) do
-      nil -> ""
-      canvas -> render_canvas_to_string(canvas, new_opts)
-    end
-  end
-
-  defp find_fitting_label_width(_graph, _opts, _max_width, mlw, min_mlw) when mlw <= min_mlw,
-    do: min_mlw
-
-  defp find_fitting_label_width(graph, opts, max_width, mlw, min_mlw) do
-    new_mlw = max(div(mlw, 2), min_mlw)
-    test_opts = opts |> Keyword.put(:max_label_width, new_mlw) |> Keyword.delete(:max_width)
-
-    case render_graph_canvas(graph, test_opts) do
-      nil ->
-        new_mlw
-
-      canvas ->
-        output = Canvas.render(canvas)
-
-        actual =
-          output |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
-
-        if actual <= max_width do
-          new_mlw
-        else
-          find_fitting_label_width(graph, opts, max_width, new_mlw, min_mlw)
-        end
-    end
-  end
-
-  defp clamp_width(output, nil), do: output
-
-  defp clamp_width(output, max_width) when is_integer(max_width) and max_width > 0 do
-    output
-    |> String.split("\n")
-    |> Enum.map_join("\n", fn line ->
-      if String.length(line) > max_width, do: String.slice(line, 0, max_width), else: line
-    end)
   end
 
   @doc """
