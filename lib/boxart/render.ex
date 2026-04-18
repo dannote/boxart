@@ -38,8 +38,20 @@ defmodule Boxart.Render do
   @spec render_graph(Graph.t(), render_opts()) :: String.t()
   def render_graph(graph, opts \\ []) do
     case render_graph_canvas(graph, opts) do
-      nil -> ""
-      canvas -> Canvas.render(canvas)
+      nil ->
+        ""
+
+      canvas ->
+        case Keyword.get(opts, :theme) do
+          nil ->
+            Canvas.render(canvas)
+
+          theme_name when is_atom(theme_name) ->
+            Canvas.render_ansi(canvas, Boxart.Theme.get(theme_name))
+
+          %Boxart.Theme{} = theme ->
+            Canvas.render_ansi(canvas, theme)
+        end
     end
   end
 
@@ -66,7 +78,7 @@ defmodule Boxart.Render do
     canvas
     |> draw_subgraph_borders(layout, cs)
     |> draw_nodes(graph, layout, cs)
-    |> draw_edges(graph, routed, cs)
+    |> draw_edges(graph, routed, cs, opts)
     |> draw_subgraph_labels(graph, layout)
   end
 
@@ -190,13 +202,13 @@ defmodule Boxart.Render do
 
     canvas
     # Top border
-    |> Canvas.put(x, y, cs.subgraph.top_left)
+    |> Canvas.put(x, y, cs.subgraph.top_left, style: "subgraph")
     |> Canvas.fill_horizontal(y, x + 1, x + w - 1, cs.subgraph.horizontal)
-    |> Canvas.put(x + w - 1, y, cs.subgraph.top_right)
+    |> Canvas.put(x + w - 1, y, cs.subgraph.top_right, style: "subgraph")
     # Bottom border
-    |> Canvas.put(x, y + h - 1, cs.subgraph.bottom_left)
+    |> Canvas.put(x, y + h - 1, cs.subgraph.bottom_left, style: "subgraph")
     |> Canvas.fill_horizontal(y + h - 1, x + 1, x + w - 1, cs.subgraph.horizontal)
-    |> Canvas.put(x + w - 1, y + h - 1, cs.subgraph.bottom_right)
+    |> Canvas.put(x + w - 1, y + h - 1, cs.subgraph.bottom_right, style: "subgraph")
     # Side borders
     |> fill_vertical_both(x, x + w - 1, y + 1, y + h - 1, cs.subgraph.vertical)
   end
@@ -218,7 +230,7 @@ defmodule Boxart.Render do
     if label && label != "" do
       x = max(0, sb.x)
       y = max(0, sb.y)
-      Canvas.put_text(canvas, x + 2, y + 1, label)
+      Canvas.put_text(canvas, x + 2, y + 1, label, style: "subgraph_label")
     else
       canvas
     end
@@ -236,10 +248,30 @@ defmodule Boxart.Render do
   defp draw_nodes(canvas, graph, layout, cs) do
     Enum.reduce(graph.node_order, canvas, fn nid, acc ->
       case Map.get(layout.placements, nid) do
-        nil -> acc
-        placement -> draw_node(acc, graph, nid, placement, cs)
+        nil ->
+          acc
+
+        p ->
+          acc
+          |> draw_node(graph, nid, p, cs)
+          |> stamp_node_style(p)
       end
     end)
+  end
+
+  defp stamp_node_style(canvas, p) do
+    for col <- p.draw_x..(p.draw_x + p.draw_width - 1)//1,
+        row <- p.draw_y..(p.draw_y + p.draw_height - 1)//1,
+        reduce: canvas do
+      acc ->
+        case Map.get(acc.cells, {col, row}) do
+          %{char: " "} -> acc
+          %{style: "label"} -> acc
+          %{style: "dim"} -> acc
+          nil -> acc
+          cell -> %{acc | cells: Map.put(acc.cells, {col, row}, %{cell | style: "node"})}
+        end
+    end
   end
 
   defp draw_node(canvas, graph, nid, p, cs) do
@@ -297,14 +329,14 @@ defmodule Boxart.Render do
 
   # -- Edges --
 
-  defp draw_edges(canvas, graph, routed, cs) do
+  defp draw_edges(canvas, graph, routed, cs, opts) do
     canvas
-    |> draw_edge_lines_and_corners(graph, routed, cs)
+    |> draw_edge_lines_and_corners(graph, routed, cs, opts)
     |> draw_edge_arrows_and_junctions(graph, routed, cs)
     |> draw_edge_labels(routed)
   end
 
-  defp draw_edge_lines_and_corners(canvas, _graph, routed, cs) do
+  defp draw_edge_lines_and_corners(canvas, _graph, routed, cs, opts) do
     Enum.reduce(routed, canvas, fn re, acc ->
       if length(re.draw_path) < 2 do
         acc
@@ -314,7 +346,7 @@ defmodule Boxart.Render do
 
         acc
         |> draw_edge_segments(re.draw_path, edge, h_char, v_char)
-        |> draw_edge_corners(re.draw_path, cs)
+        |> draw_edge_corners(re.draw_path, cs, opts)
       end
     end)
   end
@@ -414,15 +446,17 @@ defmodule Boxart.Render do
 
   # -- Corners --
 
-  defp draw_edge_corners(canvas, path, _cs) when length(path) < 3, do: canvas
+  defp draw_edge_corners(canvas, path, _cs, _opts) when length(path) < 3, do: canvas
 
-  defp draw_edge_corners(canvas, path, cs) do
+  defp draw_edge_corners(canvas, path, cs, opts) do
+    rounded = Keyword.get(opts, :rounded_edges, true)
+
     path
     |> Enum.chunk_every(3, 1, :discard)
     |> Enum.reduce(canvas, fn [{xp, yp}, {xc, yc}, {xn, yn}], acc ->
-      case corner_char(xp, yp, xc, yc, xn, yn, cs) do
+      case corner_char(xp, yp, xc, yc, xn, yn, cs, rounded) do
         nil -> acc
-        ch -> Canvas.put(acc, xc, yc, ch)
+        ch -> Canvas.put(acc, xc, yc, ch, style: "edge")
       end
     end)
   end
@@ -430,14 +464,14 @@ defmodule Boxart.Render do
   @doc false
   @spec corner_char(integer(), integer(), integer(), integer(), integer(), integer(), Charset.t()) ::
           String.t() | nil
-  def corner_char(x_prev, y_prev, x_curr, y_curr, x_next, y_next, cs) do
+  def corner_char(x_prev, y_prev, x_curr, y_curr, x_next, y_next, cs, rounded \\ true) do
     dx_in = sign(x_curr - x_prev)
     dy_in = sign(y_curr - y_prev)
     dx_out = sign(x_next - x_curr)
     dy_out = sign(y_next - y_curr)
 
-    rounded_corners(cs)
-    |> Map.get({dx_in, dy_in, dx_out, dy_out})
+    corners = if rounded, do: rounded_corners(cs), else: sharp_corners(cs)
+    Map.get(corners, {dx_in, dy_in, dx_out, dy_out})
   end
 
   defp rounded_corners(cs) do
@@ -450,6 +484,19 @@ defmodule Boxart.Render do
       {0, 1, -1, 0} => cs.box.round_bottom_right,
       {0, -1, 1, 0} => cs.box.round_top_left,
       {0, -1, -1, 0} => cs.box.round_top_right
+    }
+  end
+
+  defp sharp_corners(cs) do
+    %{
+      {1, 0, 0, 1} => cs.box.top_right,
+      {1, 0, 0, -1} => cs.box.bottom_right,
+      {-1, 0, 0, 1} => cs.box.top_left,
+      {-1, 0, 0, -1} => cs.box.bottom_left,
+      {0, 1, 1, 0} => cs.box.bottom_left,
+      {0, 1, -1, 0} => cs.box.bottom_right,
+      {0, -1, 1, 0} => cs.box.top_left,
+      {0, -1, -1, 0} => cs.box.top_right
     }
   end
 
@@ -488,7 +535,7 @@ defmodule Boxart.Render do
         _ -> arrow_char(ndx, ndy, cs)
       end
 
-    Canvas.put(canvas, ax, ay, ch)
+    Canvas.put(canvas, ax, ay, ch, style: "arrow")
   end
 
   defp arrow_char(ndx, _ndy, cs) when ndx > 0, do: cs.arrows.right
@@ -521,7 +568,7 @@ defmodule Boxart.Render do
   defp draw_tee(canvas, {ex, ey}, {nx, ny}, cs) do
     case tee_char(nx - ex, ny - ey, cs) do
       nil -> canvas
-      tee -> Canvas.put(canvas, ex, ey, tee)
+      tee -> Canvas.put(canvas, ex, ey, tee, style: "edge")
     end
   end
 
@@ -704,7 +751,7 @@ defmodule Boxart.Render do
         canvas =
           canvas
           |> Canvas.resize(col_end + 1, row + 1)
-          |> Canvas.put_text(col, row, label)
+          |> Canvas.put_text(col, row, label, style: "edge_label")
 
         {:ok, canvas, [{row, col, col_end} | placed]}
     end
@@ -745,8 +792,8 @@ defmodule Boxart.Render do
   defp fill_vertical_both(canvas, x_left, x_right, row_start, row_end, ch) do
     Enum.reduce(row_start..(row_end - 1)//1, canvas, fn r, acc ->
       acc
-      |> Canvas.put(x_left, r, ch)
-      |> Canvas.put(x_right, r, ch)
+      |> Canvas.put(x_left, r, ch, style: "subgraph")
+      |> Canvas.put(x_right, r, ch, style: "subgraph")
     end)
   end
 

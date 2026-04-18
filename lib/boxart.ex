@@ -57,6 +57,8 @@ defmodule Boxart do
           | {:padding_x, non_neg_integer()}
           | {:padding_y, non_neg_integer()}
           | {:gap, non_neg_integer()}
+          | {:theme, atom() | Boxart.Theme.t()}
+          | {:rounded_edges, boolean()}
 
   @doc """
   Renders a libgraph `Graph.t()` as a Unicode/ASCII text diagram.
@@ -68,6 +70,9 @@ defmodule Boxart do
     * `:padding_x` — horizontal padding inside node boxes (default: `4`)
     * `:padding_y` — vertical padding inside node boxes (default: `2`)
     * `:gap` — space between nodes (default: `4`)
+    * `:theme` — color theme: `:default`, `:mono`, `:neon`, `:dracula`, `:nord`,
+      `:amber`, `:phosphor`, or a `%Boxart.Theme{}` struct
+    * `:rounded_edges` — use rounded corners on edge turns (default: `true`)
 
   Returns `""` for empty graphs.
   """

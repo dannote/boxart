@@ -621,7 +621,7 @@ defmodule Boxart.Render.Shapes do
       col = x + div(width - Boxart.Utils.display_width(line), 2)
 
       if row >= 0 do
-        Canvas.put_text(acc, col, row, line)
+        Canvas.put_text(acc, col, row, line, style: "label")
       else
         acc
       end

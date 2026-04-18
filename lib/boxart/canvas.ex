@@ -360,6 +360,47 @@ defmodule Boxart.Canvas do
   end
 
   @doc """
+  Render canvas to an ANSI-colored string using the given theme.
+  """
+  @spec render_ansi(t(), Boxart.Theme.t()) :: String.t()
+  def render_ansi(%__MODULE__{} = canvas, %Boxart.Theme{} = theme) do
+    0..(canvas.height - 1)
+    |> Enum.map(fn r ->
+      row_cells =
+        for c <- 0..(canvas.width - 1) do
+          cell = Map.get(canvas.cells, {c, r}, %Cell{})
+          {cell.char, cell.style}
+        end
+
+      render_ansi_row(row_cells, theme)
+    end)
+    |> Enum.drop_while(&(&1 == ""))
+    |> Enum.reverse()
+    |> Enum.drop_while(&(&1 == ""))
+    |> Enum.reverse()
+    |> Enum.join("\n")
+  end
+
+  defp render_ansi_row(cells, theme) do
+    cells
+    |> Enum.chunk_by(fn {_ch, style} -> style end)
+    |> Enum.map(&render_ansi_chunk(&1, theme))
+    |> IO.iodata_to_binary()
+    |> String.trim_trailing()
+  end
+
+  defp render_ansi_chunk(cells, theme) do
+    {chars, style_key} = {Enum.map(cells, &elem(&1, 0)), elem(hd(cells), 1)}
+    text = Enum.join(chars)
+    ansi = Boxart.Theme.style_for(theme, style_key)
+
+    case ansi do
+      [] -> text
+      styles -> IO.ANSI.format(styles ++ [text], true)
+    end
+  end
+
+  @doc """
   Flip the canvas vertically (for BT direction).
   """
   @spec flip_vertical(t()) :: t()
