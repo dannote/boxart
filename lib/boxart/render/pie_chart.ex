@@ -208,8 +208,5 @@ defmodule Boxart.Render.PieChart do
 
   defp fill_char(fills, index), do: Enum.at(fills, rem(index, length(fills)))
 
-  defp rjust(str, width) do
-    w = Utils.display_width(str)
-    if w < width, do: String.duplicate(" ", width - w) <> str, else: str
-  end
+  defdelegate rjust(str, width), to: Utils
 end

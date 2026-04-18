@@ -285,7 +285,7 @@ defmodule Boxart.Routing do
   defp pick_path(path_pref, path_alt, preferred, alt, fallback_coords) do
     case {path_pref, path_alt} do
       {nil, nil} ->
-        {sc, sr, ec, er} = fallback_coords || {0, 0, 0, 0}
+        {sc, sr, ec, er} = fallback_coords
         {[{sc, sr}, {ec, er}], elem(preferred, 0), elem(preferred, 1)}
 
       {nil, path_alt} ->
@@ -449,7 +449,10 @@ defmodule Boxart.Routing do
   end
 
   defp snap_endpoint_to_border(re, nil), do: re
-  defp snap_endpoint_to_border(%{edge: %{source: s, target: s}} = re, _tgt), do: re
+
+  defp snap_endpoint_to_border(%{edge: %Boxart.Graph.Edge{source: s, target: s}} = re, _tgt),
+    do: re
+
   defp snap_endpoint_to_border(%{draw_path: path} = re, _tgt) when length(path) < 3, do: re
 
   defp snap_endpoint_to_border(%{draw_path: path} = re, tgt) do
@@ -479,30 +482,28 @@ defmodule Boxart.Routing do
   end
 
   defp deflect_all_from_nodes(routed, layout) do
+    all_bounds =
+      Enum.map(layout.placements, fn {nid, p} ->
+        {nid, node_draw_bounds(p)}
+      end)
+
     Enum.map(routed, fn re ->
-      %{re | draw_path: deflect_from_nodes(re.draw_path, re.edge, layout)}
+      %{re | draw_path: deflect_from_nodes(re.draw_path, re.edge, all_bounds)}
     end)
   end
 
   # --- Draw path deflection ---
 
-  defp deflect_from_nodes(draw_path, _edge, _layout) when length(draw_path) < 2, do: draw_path
+  defp deflect_from_nodes(draw_path, _edge, _all_bounds) when length(draw_path) < 2, do: draw_path
 
-  defp deflect_from_nodes(draw_path, edge, layout) do
+  defp deflect_from_nodes(draw_path, edge, all_bounds) do
     # Build bounds for non-source/target nodes (intermediate obstacles)
     # AND for the target node (edges shouldn't pass through it either,
     # except at the actual endpoint)
     obstacle_bounds =
-      layout.placements
+      all_bounds
       |> Enum.reject(fn {nid, _} -> nid == edge.source end)
-      |> Enum.map(fn {_nid, p} ->
-        %{
-          left: p.draw_x,
-          top: p.draw_y,
-          right: p.draw_x + p.draw_width - 1,
-          bottom: p.draw_y + p.draw_height - 1
-        }
-      end)
+      |> Enum.map(&elem(&1, 1))
 
     # Only deflect intermediate points, never the first or last
     path_len = length(draw_path)
@@ -540,6 +541,15 @@ defmodule Boxart.Routing do
       min_d == dist_b -> {x, b.bottom + 2}
       true -> {x, b.top - 2}
     end
+  end
+
+  defp node_draw_bounds(p) do
+    %{
+      left: p.draw_x,
+      top: p.draw_y,
+      right: p.draw_x + p.draw_width - 1,
+      bottom: p.draw_y + p.draw_height - 1
+    }
   end
 
   # --- Layout delegation ---

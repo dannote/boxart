@@ -229,7 +229,7 @@ defmodule Boxart.Graph do
 
     node_order =
       case Graph.topsort(libgraph) do
-        false -> bfs_order(libgraph, vertices)
+        false -> source_biased_order(libgraph, vertices)
         sorted -> Enum.map(sorted, &to_id/1)
       end
 
@@ -245,8 +245,8 @@ defmodule Boxart.Graph do
         }
       end)
       |> Enum.sort_by(fn e ->
-        si = Map.get(order_index, e.source, 999_999)
-        ti = Map.get(order_index, e.target, 999_999)
+        si = Map.get(order_index, e.source, :infinity)
+        ti = Map.get(order_index, e.target, :infinity)
         {si, ti}
       end)
 
@@ -258,16 +258,19 @@ defmodule Boxart.Graph do
     }
   end
 
-  defp bfs_order(libgraph, vertices) do
-    in_edges = Map.new(vertices, fn v -> {v, length(Graph.in_neighbors(libgraph, v))} end)
-    out_edges = Map.new(vertices, fn v -> {v, length(Graph.out_neighbors(libgraph, v))} end)
+  defp source_biased_order(libgraph, vertices) do
+    edges = Graph.edges(libgraph)
 
-    sorted =
-      Enum.sort_by(vertices, fn v ->
-        {Map.get(in_edges, v, 0) - Map.get(out_edges, v, 0), to_id(v)}
+    {in_deg, out_deg} =
+      Enum.reduce(edges, {%{}, %{}}, fn e, {ind, outd} ->
+        {Map.update(ind, e.v2, 1, &(&1 + 1)), Map.update(outd, e.v1, 1, &(&1 + 1))}
       end)
 
-    Enum.map(sorted, &to_id/1)
+    vertices
+    |> Enum.sort_by(fn v ->
+      {Map.get(in_deg, v, 0) - Map.get(out_deg, v, 0), to_id(v)}
+    end)
+    |> Enum.map(&to_id/1)
   end
 
   defp to_id(v) when is_binary(v), do: v
