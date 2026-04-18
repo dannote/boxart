@@ -93,6 +93,7 @@ defmodule Boxart.Routing do
     routed
     |> spread_shared_endpoints(layout)
     |> deflect_all_from_nodes(layout)
+    |> snap_back_edge_endpoints(layout)
   end
 
   # --- Direction helpers ---
@@ -440,6 +441,43 @@ defmodule Boxart.Routing do
     end)
   end
 
+  defp snap_back_edge_endpoints(routed, layout) do
+    Enum.map(routed, fn re ->
+      tgt = Map.get(layout.placements, re.edge.target)
+      snap_endpoint_to_border(re, tgt)
+    end)
+  end
+
+  defp snap_endpoint_to_border(re, nil), do: re
+  defp snap_endpoint_to_border(%{edge: %{source: s, target: s}} = re, _tgt), do: re
+  defp snap_endpoint_to_border(%{draw_path: path} = re, _tgt) when length(path) < 3, do: re
+
+  defp snap_endpoint_to_border(%{draw_path: path} = re, tgt) do
+    {ex, ey} = List.last(path)
+    right = tgt.draw_x + tgt.draw_width - 1
+
+    # Only fix endpoints that are on/near the right border but not at top/bottom corners
+    if ex >= right and ey > tgt.draw_y and ey < tgt.draw_y + tgt.draw_height - 1 do
+      # Snap to nearest top or bottom border
+      new_ey =
+        if abs(ey - tgt.draw_y) <= abs(ey - (tgt.draw_y + tgt.draw_height - 1)),
+          do: tgt.draw_y,
+          else: tgt.draw_y + tgt.draw_height - 1
+
+      # Update last point and the point before it to maintain orthogonal path
+      {prev_x, _prev_y} = Enum.at(path, -2)
+
+      new_path =
+        path
+        |> List.replace_at(-1, {ex, new_ey})
+        |> List.replace_at(-2, {prev_x, new_ey})
+
+      %{re | draw_path: new_path}
+    else
+      re
+    end
+  end
+
   defp deflect_all_from_nodes(routed, layout) do
     Enum.map(routed, fn re ->
       %{re | draw_path: deflect_from_nodes(re.draw_path, re.edge, layout)}
@@ -490,7 +528,6 @@ defmodule Boxart.Routing do
   end
 
   defp push_outside(x, y, b) do
-    # Push to the nearest edge + 2 margin
     dist_r = abs(x - b.right)
     dist_l = abs(x - b.left)
     dist_b = abs(y - b.bottom)
