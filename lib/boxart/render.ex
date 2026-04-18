@@ -59,42 +59,8 @@ defmodule Boxart.Render do
     else
       shrunk = try_shrink_labels(graph, opts, max_width)
 
-      shrunk_w =
-        shrunk |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
-
-      if shrunk_w <= max_width do
-        shrunk
-      else
-        try_mindmap_fallback(graph, opts, max_width, shrunk)
-      end
+      clamp_width(shrunk, max_width)
     end
-  end
-
-  defp try_mindmap_fallback(graph, opts, max_width, fallback) do
-    libgraph = internal_to_libgraph(graph)
-    mindmap_output = Boxart.Render.Mindmap.render(libgraph, Keyword.take(opts, [:charset]))
-
-    mindmap_w =
-      mindmap_output |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
-
-    if mindmap_w <= max_width and mindmap_output != "" do
-      mindmap_output
-    else
-      clamp_width(fallback, max_width)
-    end
-  end
-
-  defp internal_to_libgraph(%Boxart.Graph{} = g) do
-    lg =
-      Enum.reduce(g.node_order, Graph.new(), fn nid, acc ->
-        node = Map.get(g.nodes, nid)
-        label = if node, do: [label: node.label], else: []
-        Graph.add_vertex(acc, nid, label)
-      end)
-
-    Enum.reduce(g.edges, lg, fn e, acc ->
-      Graph.add_edge(acc, e.source, e.target)
-    end)
   end
 
   defp render_canvas_to_string(canvas, opts) do
