@@ -376,6 +376,10 @@ defmodule Boxart.Graph do
     %{graph | edges: edges ++ [edge]}
   end
 
+  @doc "Returns a copy of the graph with the given direction."
+  @spec with_direction(t(), direction()) :: t()
+  def with_direction(%__MODULE__{} = graph, direction), do: %{graph | direction: direction}
+
   @doc """
   Returns root node ids — nodes with no incoming edges, in definition order.
 

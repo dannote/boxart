@@ -107,7 +107,8 @@ defmodule Boxart.Layout do
             canvas_height: 0,
             subgraph_bounds: [],
             offset_x: 0,
-            offset_y: 0
+            offset_y: 0,
+            wrapped_labels: %{}
 
   @doc "Check if a grid cell is not occupied, optionally excluding certain node IDs."
   @spec free?(t(), integer(), integer(), MapSet.t() | nil) :: boolean()

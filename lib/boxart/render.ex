@@ -100,7 +100,7 @@ defmodule Boxart.Render do
 
   Returns `nil` for empty graphs.
   """
-  @spec render_graph_canvas(Graph.t(), render_opts()) :: Canvas.t() | nil
+  @spec render_graph_canvas(BGraph.t(), render_opts()) :: Canvas.t() | nil
   def render_graph_canvas(%BGraph{node_order: []} = _graph, _opts), do: nil
 
   def render_graph_canvas(%BGraph{} = graph, opts) do
@@ -293,7 +293,7 @@ defmodule Boxart.Render do
 
         p ->
           acc
-          |> draw_node(graph, nid, p, cs)
+          |> draw_node(graph, layout, nid, p, cs)
           |> stamp_node_style(p)
       end
     end)
@@ -314,7 +314,7 @@ defmodule Boxart.Render do
     end
   end
 
-  defp draw_node(canvas, graph, nid, p, cs) do
+  defp draw_node(canvas, graph, layout, nid, p, cs) do
     node = Map.fetch!(graph.nodes, nid)
 
     canvas =
@@ -351,7 +351,7 @@ defmodule Boxart.Render do
           p.draw_y,
           p.draw_width,
           p.draw_height,
-          node.label || nid,
+          Map.get(layout.wrapped_labels, nid, node.label || nid),
           cs
         )
       end

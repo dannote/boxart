@@ -244,9 +244,12 @@ defmodule Boxart.Layout.Placement do
     col = placement.grid.col
     row = placement.grid.row
 
+    wrapped_label = Enum.join(wrapped, "\n")
+
     layout
     |> ensure_col_width(col, content_width)
     |> ensure_row_height(row, content_height)
+    |> put_in([Access.key(:wrapped_labels), node.id], wrapped_label)
   end
 
   defp collect_grid_cells(layout) do

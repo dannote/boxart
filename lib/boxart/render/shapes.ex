@@ -9,9 +9,6 @@ defmodule Boxart.Render.Shapes do
 
   alias Boxart.Canvas
   alias Boxart.Charset
-  alias Boxart.Utils
-
-  @max_label_width Boxart.Layout.max_label_width()
 
   @type shape ::
           :rectangle
@@ -629,40 +626,10 @@ defmodule Boxart.Render.Shapes do
   end
 
   defp split_label(label) do
-    lines =
-      cond do
-        String.contains?(label, "\n") -> String.split(label, "\n")
-        String.contains?(label, "\\n") -> String.split(label, "\\n")
-        true -> [label]
-      end
-
-    Enum.flat_map(lines, fn line ->
-      if Utils.display_width(line) <= @max_label_width do
-        [line]
-      else
-        word_wrap(line, @max_label_width)
-      end
-    end)
-  end
-
-  defp word_wrap(text, max_width) do
-    words = String.split(text)
-
-    case words do
-      [] ->
-        [text]
-
-      [first | rest] ->
-        {lines, current} = Enum.reduce(rest, {[], first}, &wrap_word(&1, &2, max_width))
-        Enum.reverse([current | lines])
-    end
-  end
-
-  defp wrap_word(word, {lines, current}, max_width) do
-    if Utils.display_width(current) + 1 + Utils.display_width(word) <= max_width do
-      {lines, current <> " " <> word}
-    else
-      {[current | lines], word}
+    cond do
+      String.contains?(label, "\n") -> String.split(label, "\n")
+      String.contains?(label, "\\n") -> String.split(label, "\\n")
+      true -> [label]
     end
   end
 end

@@ -160,4 +160,64 @@ defmodule BoxartTest do
 
     assert narrow_w < wide_w
   end
+
+  test "max_width compacts gap and padding before clamping" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex("A", label: "Alpha Node")
+      |> Graph.add_vertex("B", label: "Beta Node")
+      |> Graph.add_vertex("C", label: "Gamma Node")
+      |> Graph.add_vertex("D", label: "Delta Node")
+      |> Graph.add_edge("A", "B")
+      |> Graph.add_edge("A", "C")
+      |> Graph.add_edge("A", "D")
+
+    full = Boxart.render(g, direction: :td)
+    compact = Boxart.render(g, direction: :td, max_width: 40)
+
+    full_w = full |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max()
+    compact_w = compact |> String.split("\n") |> Enum.map(&String.length/1) |> Enum.max()
+
+    assert compact_w <= 40
+    assert compact_w <= full_w
+  end
+
+  test "max_width stacks siblings vertically when needed" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex("root", source: "if condition do", start_line: 1)
+      |> Graph.add_vertex("a", source: "long_function_call(arg1, arg2)", start_line: 2)
+      |> Graph.add_vertex("b", source: "another_long_call(x, y, z)", start_line: 3)
+      |> Graph.add_edge("root", "a")
+      |> Graph.add_edge("root", "b")
+
+    out = Boxart.render(g, direction: :td, max_width: 50)
+    assert String.contains?(out, "long_function_call")
+    assert String.contains?(out, "another_long_call")
+  end
+
+  test "Canvas.clamp_width drops cells beyond limit" do
+    canvas =
+      Boxart.Canvas.new(20, 3)
+      |> Boxart.Canvas.put(5, 1, "A")
+      |> Boxart.Canvas.put(15, 1, "B")
+
+    clamped = Boxart.Canvas.clamp_width(canvas, 10)
+    assert clamped.width == 10
+    rendered = Boxart.Canvas.render(clamped)
+    assert String.contains?(rendered, "A")
+    refute String.contains?(rendered, "B")
+  end
+
+  test "mindmap handles tuple vertices without crash" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex({:mod, :fun, 1}, label: "fun/1")
+      |> Graph.add_vertex({:mod, :dep, 0}, label: "dep/0")
+      |> Graph.add_edge({:mod, :fun, 1}, {:mod, :dep, 0})
+
+    out = Boxart.Render.Mindmap.render(g)
+    assert String.contains?(out, "fun/1")
+    assert String.contains?(out, "dep/0")
+  end
 end
