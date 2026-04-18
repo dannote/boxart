@@ -172,7 +172,7 @@ defmodule Boxart.Layout do
     layout =
       layout
       |> Placement.place_nodes(graph, layer_order, direction, gap_expansions)
-      |> Placement.compute_sizes(graph, padding_x, padding_y, gap)
+      |> Placement.compute_sizes(graph, padding_x, padding_y, gap, opts)
       |> Placement.normalize_sizes(graph)
       |> Subgraphs.expand_gaps_for_subgraphs(graph, direction)
       |> Coordinates.compute_draw_coords()

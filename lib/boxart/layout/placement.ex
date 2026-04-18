@@ -47,13 +47,16 @@ defmodule Boxart.Layout.Placement do
   @doc """
   Compute column widths and row heights based on node content.
   """
-  @spec compute_sizes(Layout.t(), Graph.t(), integer(), integer(), integer()) :: Layout.t()
-  def compute_sizes(%Layout{} = layout, %Graph{} = graph, padding_x, padding_y, gap) do
+  @spec compute_sizes(Layout.t(), Graph.t(), integer(), integer(), integer(), keyword()) ::
+          Layout.t()
+  def compute_sizes(%Layout{} = layout, %Graph{} = graph, padding_x, padding_y, gap, opts \\ []) do
+    max_lw = Keyword.get(opts, :max_label_width, @max_label_width)
+
     layout =
       Enum.reduce(layout.placements, layout, fn {nid, placement}, l ->
         node = Map.fetch!(graph.nodes, nid)
 
-        compute_node_content_size(l, node, placement, padding_x, padding_y)
+        compute_node_content_size(l, node, placement, padding_x, padding_y, max_lw)
       end)
 
     layout
@@ -175,19 +178,26 @@ defmodule Boxart.Layout.Placement do
     %{layout | grid_occupied: occupied}
   end
 
-  defp compute_node_content_size(layout, %{shape: :junction} = _node, placement, _px, _py) do
+  defp compute_node_content_size(
+         layout,
+         %{shape: :junction} = _node,
+         placement,
+         _px,
+         _py,
+         _max_lw
+       ) do
     layout
     |> ensure_col_width(placement.grid.col, 1)
     |> ensure_row_height(placement.grid.row, 1)
   end
 
-  defp compute_node_content_size(layout, %{source: source} = node, placement, _px, _py)
+  defp compute_node_content_size(layout, %{source: source} = node, placement, _px, _py, _max_lw)
        when not is_nil(source) do
     compute_code_node_size(layout, node, placement)
   end
 
-  defp compute_node_content_size(layout, node, placement, padding_x, padding_y) do
-    compute_node_size(layout, node, placement, padding_x, padding_y)
+  defp compute_node_content_size(layout, node, placement, padding_x, padding_y, max_lw) do
+    compute_node_size(layout, node, placement, padding_x, padding_y, max_lw)
   end
 
   defp compute_code_node_size(layout, node, placement) do
@@ -208,7 +218,7 @@ defmodule Boxart.Layout.Placement do
     |> ensure_row_height(row, content_height)
   end
 
-  defp compute_node_size(layout, node, placement, padding_x, padding_y) do
+  defp compute_node_size(layout, node, placement, padding_x, padding_y, max_lw) do
     lines =
       cond do
         String.contains?(node.label, "\n") -> String.split(node.label, "\n")
@@ -218,10 +228,10 @@ defmodule Boxart.Layout.Placement do
 
     wrapped =
       Enum.flat_map(lines, fn line ->
-        if Utils.display_width(line) <= @max_label_width do
+        if Utils.display_width(line) <= max_lw do
           [line]
         else
-          word_wrap(line, @max_label_width)
+          word_wrap(line, max_lw)
         end
       end)
 

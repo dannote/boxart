@@ -71,6 +71,8 @@ defmodule Boxart do
           | {:gap, non_neg_integer()}
           | {:theme, atom() | Boxart.Theme.t()}
           | {:rounded_edges, boolean()}
+          | {:max_width, pos_integer()}
+          | {:max_label_width, pos_integer()}
 
   @doc """
   Renders a libgraph `Graph.t()` as a Unicode/ASCII text diagram.
@@ -85,6 +87,8 @@ defmodule Boxart do
     * `:theme` — color theme: `:default`, `:mono`, `:neon`, `:dracula`, `:nord`,
       `:amber`, `:phosphor`, or a `%Boxart.Theme{}` struct
     * `:rounded_edges` — use rounded corners on edge turns (default: `true`)
+    * `:max_width` — clamp output width to this many columns (truncates lines)
+    * `:max_label_width` — maximum label width before word wrapping (default: `20`)
 
   Returns `""` for empty graphs.
   """

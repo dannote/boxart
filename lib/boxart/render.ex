@@ -42,17 +42,31 @@ defmodule Boxart.Render do
         ""
 
       canvas ->
-        case Keyword.get(opts, :theme) do
-          nil ->
-            Canvas.render(canvas)
+        output =
+          case Keyword.get(opts, :theme) do
+            nil ->
+              Canvas.render(canvas)
 
-          theme_name when is_atom(theme_name) ->
-            Canvas.render_ansi(canvas, Boxart.Theme.get(theme_name))
+            theme_name when is_atom(theme_name) ->
+              Canvas.render_ansi(canvas, Boxart.Theme.get(theme_name))
 
-          %Boxart.Theme{} = theme ->
-            Canvas.render_ansi(canvas, theme)
-        end
+            %Boxart.Theme{} = theme ->
+              Canvas.render_ansi(canvas, theme)
+          end
+
+        clamp_width(output, Keyword.get(opts, :max_width))
     end
+  end
+
+  defp clamp_width(output, nil), do: output
+
+  defp clamp_width(output, max_width) when is_integer(max_width) and max_width > 0 do
+    output
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      if String.length(line) > max_width, do: String.slice(line, 0, max_width), else: line
+    end)
+    |> Enum.join("\n")
   end
 
   @doc """
@@ -65,7 +79,7 @@ defmodule Boxart.Render do
 
   def render_graph_canvas(%Graph{} = graph, opts) do
     cs = charset_from_opts(opts)
-    layout_opts = Keyword.take(opts, [:padding_x, :padding_y, :gap])
+    layout_opts = Keyword.take(opts, [:padding_x, :padding_y, :gap, :max_label_width])
 
     {graph, needs_v_flip, needs_h_flip} = normalize_direction(graph)
 
