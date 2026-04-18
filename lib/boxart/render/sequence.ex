@@ -132,7 +132,7 @@ defmodule Boxart.Render.Sequence do
   def render(%SequenceDiagram{} = diagram, opts \\ []) do
     diagram
     |> render_canvas(opts)
-    |> Canvas.to_string()
+    |> Canvas.render()
   end
 
   @doc """
@@ -255,7 +255,7 @@ defmodule Boxart.Render.Sequence do
 
   defp expand_message_gaps(gaps, si, ti, label) do
     {lo, hi} = {min(si, ti), max(si, ti)}
-    per_gap = div(String.length(label) + 6 + hi - lo - 1, hi - lo)
+    per_gap = div(Utils.display_width(label) + 6 + hi - lo - 1, hi - lo)
     expand_range(gaps, lo, hi, per_gap)
   end
 
@@ -912,10 +912,5 @@ defmodule Boxart.Render.Sequence do
   defp maybe_put_label(canvas, label, col, row),
     do: Canvas.put_text(canvas, col, row, label, style: "edge_label")
 
-  defp charset_from_opts(opts) do
-    case Keyword.get(opts, :charset, :unicode) do
-      :ascii -> Charset.ascii()
-      _ -> Charset.unicode()
-    end
-  end
+  defp charset_from_opts(opts), do: Charset.from_opts(opts)
 end

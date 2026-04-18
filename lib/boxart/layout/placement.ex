@@ -9,6 +9,7 @@ defmodule Boxart.Layout.Placement do
   alias Boxart.Graph
   alias Boxart.Layout
   alias Boxart.Layout.{GridCoord, NodePlacement}
+  alias Boxart.Utils
 
   @stride Layout.stride()
   @max_label_width Layout.max_label_width()
@@ -209,22 +210,22 @@ defmodule Boxart.Layout.Placement do
 
   defp compute_node_size(layout, node, placement, padding_x, padding_y) do
     lines =
-      if String.contains?(node.label, "\\n") do
-        String.split(node.label, "\\n")
-      else
-        [node.label]
+      cond do
+        String.contains?(node.label, "\n") -> String.split(node.label, "\n")
+        String.contains?(node.label, "\\n") -> String.split(node.label, "\\n")
+        true -> [node.label]
       end
 
     wrapped =
       Enum.flat_map(lines, fn line ->
-        if display_width(line) <= @max_label_width do
+        if Utils.display_width(line) <= @max_label_width do
           [line]
         else
           word_wrap(line, @max_label_width)
         end
       end)
 
-    text_width = wrapped |> Enum.map(&display_width/1) |> Enum.max(fn -> 0 end)
+    text_width = wrapped |> Enum.map(&Utils.display_width/1) |> Enum.max(fn -> 0 end)
     text_height = length(wrapped)
 
     content_width = max(text_width + padding_x, 3)
@@ -306,7 +307,7 @@ defmodule Boxart.Layout.Placement do
   end
 
   defp expand_label_gap(layout, _graph, edge, horizontal) do
-    label_len = display_width(edge.label)
+    label_len = Utils.display_width(edge.label)
 
     src_p = Map.get(layout.placements, edge.source)
     tgt_p = Map.get(layout.placements, edge.target)
@@ -416,14 +417,10 @@ defmodule Boxart.Layout.Placement do
   end
 
   defp wrap_word(word, {lines, current}, max_width) do
-    if display_width(current) + 1 + display_width(word) <= max_width do
+    if Utils.display_width(current) + 1 + Utils.display_width(word) <= max_width do
       {lines, current <> " " <> word}
     else
       {[current | lines], word}
     end
-  end
-
-  defp display_width(text) do
-    String.length(text)
   end
 end

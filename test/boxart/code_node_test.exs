@@ -57,7 +57,7 @@ defmodule Boxart.CodeNodeTest do
       canvas = Canvas.new(30, 10)
 
       canvas = CodeNode.render_to_canvas(canvas, 0, 0, 20, 5, label, cs)
-      output = Canvas.to_string(canvas)
+      output = Canvas.render(canvas)
 
       assert String.contains?(output, "1")
       assert String.contains?(output, "2")

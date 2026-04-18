@@ -598,9 +598,7 @@ defmodule Boxart.Render.Shapes do
   defp draw_sides_range(canvas, _x, _width, _row_start, _row_end, _ch), do: canvas
 
   defp fill_horizontal(canvas, row, col_start, col_end, ch) do
-    Enum.reduce(col_start..(col_end - 1)//1, canvas, fn c, acc ->
-      Canvas.put(acc, c, row, ch)
-    end)
+    Canvas.fill_horizontal(canvas, row, col_start, col_end, ch)
   end
 
   defp draw_slanted_box(canvas, x, y, width, height, {tl, tr, bl, br}, cs) do

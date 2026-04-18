@@ -7,7 +7,7 @@ defmodule Boxart.Charset do
   """
 
   defmodule Box do
-    @moduledoc false
+    @moduledoc "Box-drawing border characters."
 
     @type t :: %__MODULE__{
             top_left: String.t(),
@@ -37,7 +37,7 @@ defmodule Boxart.Charset do
   end
 
   defmodule Arrows do
-    @moduledoc false
+    @moduledoc "Arrow head characters."
 
     @type t :: %__MODULE__{
             right: String.t(),
@@ -50,7 +50,7 @@ defmodule Boxart.Charset do
   end
 
   defmodule Lines do
-    @moduledoc false
+    @moduledoc "Line characters (horizontal, vertical, dotted, thick)."
 
     @type t :: %__MODULE__{
             horizontal: String.t(),
@@ -65,7 +65,7 @@ defmodule Boxart.Charset do
   end
 
   defmodule Junctions do
-    @moduledoc false
+    @moduledoc "Junction and corner characters (tees, crosses)."
 
     @type t :: %__MODULE__{
             corner_top_left: String.t(),
@@ -93,7 +93,7 @@ defmodule Boxart.Charset do
   end
 
   defmodule Markers do
-    @moduledoc false
+    @moduledoc "Special markers (diamonds, circles, crosses) for edge endpoints."
 
     @type t :: %__MODULE__{
             diamond_top: String.t(),
@@ -115,7 +115,7 @@ defmodule Boxart.Charset do
   end
 
   defmodule Subgraph do
-    @moduledoc false
+    @moduledoc "Subgraph border characters."
 
     @type t :: %__MODULE__{
             top_left: String.t(),
@@ -198,6 +198,15 @@ defmodule Boxart.Charset do
         vertical: "│"
       }
     }
+  end
+
+  @doc "Selects a charset from keyword options."
+  @spec from_opts(keyword()) :: t()
+  def from_opts(opts) do
+    case Keyword.get(opts, :charset, :unicode) do
+      :ascii -> ascii()
+      _ -> unicode()
+    end
   end
 
   @doc "Returns a charset using plain ASCII characters."

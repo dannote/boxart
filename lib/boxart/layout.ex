@@ -32,12 +32,19 @@ defmodule Boxart.Layout do
   @sg_label_height 2
   @sg_gap_per_level @sg_border_pad + @sg_label_height + 1
 
+  @doc false
   def stride, do: @stride
+  @doc false
   def max_label_width, do: @max_label_width
+  @doc false
   def max_normalized_width, do: @max_normalized_width
+  @doc false
   def max_normalized_height, do: @max_normalized_height
+  @doc false
   def sg_border_pad, do: @sg_border_pad
+  @doc false
   def sg_label_height, do: @sg_label_height
+  @doc false
   def sg_gap_per_level, do: @sg_gap_per_level
 
   defmodule GridCoord do

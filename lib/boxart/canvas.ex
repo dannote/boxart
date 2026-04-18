@@ -283,6 +283,16 @@ defmodule Boxart.Canvas do
   end
 
   @doc """
+  Fill a horizontal span with a character from `col_start` to `col_end` (exclusive).
+  """
+  @spec fill_horizontal(t(), integer(), integer(), integer(), String.t()) :: t()
+  def fill_horizontal(%__MODULE__{} = canvas, row, col_start, col_end, ch) do
+    Enum.reduce(col_start..(col_end - 1)//1, canvas, fn c, acc ->
+      put(acc, c, row, ch)
+    end)
+  end
+
+  @doc """
   Draw a vertical line of a character from `row_start` to `row_end`.
   """
   @spec draw_vertical(t(), integer(), integer(), integer(), String.t(), keyword()) :: t()
@@ -319,11 +329,11 @@ defmodule Boxart.Canvas do
   end
 
   @doc """
-  Convert canvas to a string, trimming trailing whitespace per line
+  Render canvas to a string, trimming trailing whitespace per line
   and removing trailing empty lines.
   """
-  @spec to_string(t()) :: String.t()
-  def to_string(%__MODULE__{} = canvas) do
+  @spec render(t()) :: String.t()
+  def render(%__MODULE__{} = canvas) do
     0..(canvas.height - 1)
     |> Enum.map(fn r ->
       0..(canvas.width - 1)
@@ -514,6 +524,6 @@ defmodule Boxart.Canvas do
   defp wide_char?(_), do: false
 
   defimpl String.Chars do
-    def to_string(canvas), do: Boxart.Canvas.to_string(canvas)
+    def to_string(canvas), do: Boxart.Canvas.render(canvas)
   end
 end

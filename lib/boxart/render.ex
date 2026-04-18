@@ -39,7 +39,7 @@ defmodule Boxart.Render do
   def render_graph(graph, opts \\ []) do
     case render_graph_canvas(graph, opts) do
       nil -> ""
-      canvas -> Canvas.to_string(canvas)
+      canvas -> Canvas.render(canvas)
     end
   end
 
@@ -122,11 +122,11 @@ defmodule Boxart.Render do
     canvas
     # Top border
     |> Canvas.put(x, y, cs.subgraph.top_left)
-    |> fill_horizontal(y, x + 1, x + w - 1, cs.subgraph.horizontal)
+    |> Canvas.fill_horizontal(y, x + 1, x + w - 1, cs.subgraph.horizontal)
     |> Canvas.put(x + w - 1, y, cs.subgraph.top_right)
     # Bottom border
     |> Canvas.put(x, y + h - 1, cs.subgraph.bottom_left)
-    |> fill_horizontal(y + h - 1, x + 1, x + w - 1, cs.subgraph.horizontal)
+    |> Canvas.fill_horizontal(y + h - 1, x + 1, x + w - 1, cs.subgraph.horizontal)
     |> Canvas.put(x + w - 1, y + h - 1, cs.subgraph.bottom_right)
     # Side borders
     |> fill_vertical_both(x, x + w - 1, y + 1, y + h - 1, cs.subgraph.vertical)
@@ -671,12 +671,6 @@ defmodule Boxart.Render do
 
   # -- Utility --
 
-  defp fill_horizontal(canvas, row, col_start, col_end, ch) do
-    Enum.reduce(col_start..(col_end - 1)//1, canvas, fn c, acc ->
-      Canvas.put(acc, c, row, ch)
-    end)
-  end
-
   defp fill_vertical_both(canvas, x_left, x_right, row_start, row_end, ch) do
     Enum.reduce(row_start..(row_end - 1)//1, canvas, fn r, acc ->
       acc
@@ -685,12 +679,7 @@ defmodule Boxart.Render do
     end)
   end
 
-  defp charset_from_opts(opts) do
-    case Keyword.get(opts, :charset, :unicode) do
-      :ascii -> Charset.ascii()
-      _unicode -> Charset.unicode()
-    end
-  end
+  defp charset_from_opts(opts), do: Charset.from_opts(opts)
 
   defp sign(n) when n > 0, do: 1
   defp sign(n) when n < 0, do: -1

@@ -7,6 +7,8 @@ defmodule Boxart.Routing do
   Previously-routed edges' cells become soft obstacles for later edges.
   """
 
+  alias Boxart.Graph
+  alias Boxart.Layout
   alias Boxart.Routing.Pathfinder
 
   @type attach_dir :: :top | :bottom | :left | :right
@@ -17,7 +19,7 @@ defmodule Boxart.Routing do
     """
 
     @type t :: %__MODULE__{
-            edge: struct(),
+            edge: Graph.Edge.t(),
             grid_path: [{integer(), integer()}],
             draw_path: [{integer(), integer()}],
             start_dir: Boxart.Routing.attach_dir(),
@@ -46,9 +48,9 @@ defmodule Boxart.Routing do
   source and target nodes. Previously-routed edges contribute soft obstacles
   so later edges prefer avoiding overlap.
   """
-  @spec route_edges(struct(), struct()) :: [RoutedEdge.t()]
+  @spec route_edges(Graph.t(), Boxart.Layout.t()) :: [RoutedEdge.t()]
   def route_edges(graph, layout) do
-    direction = normalized_direction(graph.direction)
+    direction = Graph.normalized(graph.direction)
     sg_bounds = build_subgraph_bounds(layout)
 
     {routed, _soft} =
@@ -90,13 +92,6 @@ defmodule Boxart.Routing do
   end
 
   # --- Direction helpers ---
-
-  defp normalized_direction(:tb), do: :tb
-  defp normalized_direction(:td), do: :tb
-  defp normalized_direction(:bt), do: :tb
-  defp normalized_direction(:lr), do: :lr
-  defp normalized_direction(:rl), do: :lr
-  defp normalized_direction(other), do: other
 
   defp horizontal_direction?(:lr), do: true
   defp horizontal_direction?(_), do: false
@@ -161,7 +156,11 @@ defmodule Boxart.Routing do
   # --- Direction selection ---
 
   @doc false
-  @spec determine_directions(struct(), struct(), atom()) ::
+  @spec determine_directions(
+          Boxart.Layout.NodePlacement.t(),
+          Boxart.Layout.NodePlacement.t(),
+          atom()
+        ) ::
           {{attach_dir(), attach_dir()}, {attach_dir(), attach_dir()}}
   def determine_directions(src, tgt, direction) do
     {sc, sr} = {src.grid.col, src.grid.row}
@@ -437,10 +436,6 @@ defmodule Boxart.Routing do
   end
 
   defp grid_to_draw_center(layout, col, row) do
-    if function_exported?(layout.__struct__, :grid_to_draw_center, 3) do
-      layout.__struct__.grid_to_draw_center(layout, col, row)
-    else
-      {col, row}
-    end
+    Layout.grid_to_draw_center(layout, col, row)
   end
 end

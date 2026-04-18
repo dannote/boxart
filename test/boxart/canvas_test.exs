@@ -151,12 +151,12 @@ defmodule Boxart.CanvasTest do
         |> Canvas.put(2, 2, "┘")
 
       expected = "┌─┐\n│ │\n└─┘"
-      assert Canvas.to_string(c) == expected
+      assert Canvas.render(c) == expected
     end
 
     test "trims trailing whitespace and empty lines" do
       c = Canvas.new(5, 5) |> Canvas.put(0, 0, "X")
-      assert Canvas.to_string(c) == "X"
+      assert Canvas.render(c) == "X"
     end
   end
 

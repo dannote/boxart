@@ -35,7 +35,7 @@ defmodule Boxart.Render.PieChart do
   def render(%PieChart{} = chart, opts \\ []) do
     chart
     |> render_canvas(opts)
-    |> Canvas.to_string()
+    |> Canvas.render()
   end
 
   @doc """
@@ -79,7 +79,7 @@ defmodule Boxart.Render.PieChart do
   defp draw_title(canvas, "", _canvas_w), do: canvas
 
   defp draw_title(canvas, title, canvas_w) do
-    Canvas.put_text(canvas, max(0, div(canvas_w - String.length(title), 2)), @margin, title,
+    Canvas.put_text(canvas, max(0, div(canvas_w - Utils.display_width(title), 2)), @margin, title,
       style: "label"
     )
   end

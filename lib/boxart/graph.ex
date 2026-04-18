@@ -288,6 +288,8 @@ defmodule Boxart.Graph do
   def add_node(%__MODULE__{nodes: nodes, node_order: order} = graph, %Node{id: id} = node) do
     case Map.fetch(nodes, id) do
       :error ->
+        # O(n) append is fine — from_libgraph builds the whole graph at once via Map.new/Enum.map,
+        # so add_node is rarely called in hot loops.
         %{graph | nodes: Map.put(nodes, id, node), node_order: order ++ [id]}
 
       {:ok, existing} ->
@@ -309,6 +311,8 @@ defmodule Boxart.Graph do
   @doc "Appends an edge to the graph."
   @spec add_edge(t(), Edge.t()) :: t()
   def add_edge(%__MODULE__{edges: edges} = graph, %Edge{} = edge) do
+    # O(n) append is fine — from_libgraph builds the whole graph at once via Enum.map,
+    # so add_edge is rarely called in hot loops.
     %{graph | edges: edges ++ [edge]}
   end
 
@@ -332,17 +336,9 @@ defmodule Boxart.Graph do
   @spec get_children(t(), String.t()) :: [String.t()]
   def get_children(%__MODULE__{edges: edges}, node_id) do
     edges
-    |> Enum.reduce({[], MapSet.new()}, fn
-      %Edge{source: ^node_id, target: target}, {children, seen} when target != node_id ->
-        if MapSet.member?(seen, target),
-          do: {children, seen},
-          else: {[target | children], MapSet.put(seen, target)}
-
-      _edge, acc ->
-        acc
-    end)
-    |> elem(0)
-    |> Enum.reverse()
+    |> Enum.filter(&(&1.source == node_id and &1.target != node_id))
+    |> Enum.map(& &1.target)
+    |> Enum.uniq()
   end
 
   @doc "Finds a subgraph by its id, searching recursively through nested children."
