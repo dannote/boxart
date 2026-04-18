@@ -2,12 +2,26 @@ defmodule Boxart.Render.Mindmap do
   @moduledoc """
   Renderer for mindmap diagrams.
 
-  Renders a tree radiating from a central root node. Children branch
-  to the right by default. When the root has many children (>6),
-  the first few overflow to the left for balance.
+  Accepts a `Graph.t()` from libgraph and renders it as a tree radiating
+  from a central root node. Children branch to the right by default. When
+  the root has many children (>6), the first few overflow to the left.
 
-  This is a string-based renderer — it builds lines of text and joins them,
-  rather than using `Boxart.Canvas`.
+  Vertex labels are used as node text. The root is detected automatically
+  (the vertex with no incoming edges).
+
+  ## Example
+
+      graph =
+        Graph.new()
+        |> Graph.add_vertex("Root")
+        |> Graph.add_vertex("Design")
+        |> Graph.add_vertex("Code")
+        |> Graph.add_vertex("Test")
+        |> Graph.add_edge("Root", "Design")
+        |> Graph.add_edge("Root", "Code")
+        |> Graph.add_edge("Root", "Test")
+
+      Boxart.Render.Mindmap.render(graph)
   """
 
   @behaviour Boxart.Diagram
@@ -47,11 +61,18 @@ defmodule Boxart.Render.Mindmap do
     * `:charset` — `:unicode` (default) or `:ascii`
     * `:rounded` — use rounded corners (default: `true`, only with `:unicode`)
   """
-  @spec render(MindmapNode.t() | nil, keyword()) :: String.t()
+  @spec render(Graph.t() | MindmapNode.t() | nil, keyword()) :: String.t()
   @impl true
-  def render(root, opts \\ [])
+  def render(input, opts \\ [])
 
   def render(nil, _opts), do: ""
+
+  def render(%Graph{} = graph, opts) do
+    case from_libgraph(graph) do
+      nil -> ""
+      root -> render(root, opts)
+    end
+  end
 
   def render(%MindmapNode{children: []} = root, _opts), do: root.label
 
@@ -70,6 +91,54 @@ defmodule Boxart.Render.Mindmap do
       end
 
     Enum.join(lines, "\n")
+  end
+
+  defp from_libgraph(%Graph{} = graph) do
+    vertices = Graph.vertices(graph)
+
+    case vertices do
+      [] ->
+        nil
+
+      _ ->
+        roots =
+          Enum.filter(vertices, fn v ->
+            Graph.in_neighbors(graph, v) == []
+          end)
+
+        root = if roots == [], do: hd(vertices), else: hd(roots)
+        build_tree(graph, root, MapSet.new())
+    end
+  end
+
+  defp build_tree(graph, vertex, visited) do
+    if MapSet.member?(visited, vertex) do
+      %MindmapNode{label: vertex_label(graph, vertex)}
+    else
+      visited = MapSet.put(visited, vertex)
+
+      children =
+        graph
+        |> Graph.out_neighbors(vertex)
+        |> Enum.map(&build_tree(graph, &1, visited))
+
+      %MindmapNode{label: vertex_label(graph, vertex), children: children}
+    end
+  end
+
+  defp vertex_label(graph, vertex) do
+    case Graph.vertex_labels(graph, vertex) do
+      [] -> to_string(vertex)
+      labels -> find_label(labels, vertex)
+    end
+  end
+
+  defp find_label(labels, vertex) do
+    Enum.find_value(labels, to_string(vertex), fn
+      {key, val} when key == :label -> to_string(val)
+      kw when is_list(kw) -> Keyword.get(kw, :label) |> then(&if(&1, do: to_string(&1)))
+      _ -> nil
+    end)
   end
 
   defp make_chars(opts) do

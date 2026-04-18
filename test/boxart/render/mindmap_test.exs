@@ -131,4 +131,71 @@ defmodule Boxart.Render.MindmapTest do
       assert String.contains?(output, "┌") or String.contains?(output, "└")
     end
   end
+
+  describe "libgraph input" do
+    test "simple tree from Graph.t()" do
+      g =
+        Graph.new()
+        |> Graph.add_vertex("Root")
+        |> Graph.add_vertex("A")
+        |> Graph.add_vertex("B")
+        |> Graph.add_edge("Root", "A")
+        |> Graph.add_edge("Root", "B")
+
+      output = Mindmap.render(g)
+      assert String.contains?(output, "Root")
+      assert String.contains?(output, "A")
+      assert String.contains?(output, "B")
+    end
+
+    test "vertex labels used as text" do
+      g =
+        Graph.new()
+        |> Graph.add_vertex("r", label: "Project")
+        |> Graph.add_vertex("a", label: "Design")
+        |> Graph.add_vertex("b", label: "Build")
+        |> Graph.add_edge("r", "a")
+        |> Graph.add_edge("r", "b")
+
+      output = Mindmap.render(g)
+      assert String.contains?(output, "Project")
+      assert String.contains?(output, "Design")
+      assert String.contains?(output, "Build")
+    end
+
+    test "deeply nested graph" do
+      g =
+        Graph.new()
+        |> Graph.add_vertex("R")
+        |> Graph.add_vertex("A")
+        |> Graph.add_vertex("B")
+        |> Graph.add_vertex("C")
+        |> Graph.add_edge("R", "A")
+        |> Graph.add_edge("A", "B")
+        |> Graph.add_edge("B", "C")
+
+      output = Mindmap.render(g)
+      for name <- ~w(R A B C), do: assert(String.contains?(output, name))
+    end
+
+    test "empty graph returns empty string" do
+      assert Mindmap.render(Graph.new()) == ""
+    end
+
+    test "single vertex" do
+      g = Graph.new() |> Graph.add_vertex("Alone")
+      assert String.contains?(Mindmap.render(g), "Alone")
+    end
+
+    test "many children triggers left overflow" do
+      g =
+        Enum.reduce(1..9, Graph.new() |> Graph.add_vertex("Center"), fn i, acc ->
+          acc |> Graph.add_vertex("C#{i}") |> Graph.add_edge("Center", "C#{i}")
+        end)
+
+      output = Mindmap.render(g)
+      assert String.contains?(output, "Center")
+      for i <- 1..9, do: assert(String.contains?(output, "C#{i}"))
+    end
+  end
 end
