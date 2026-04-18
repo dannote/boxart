@@ -51,7 +51,8 @@ defmodule Boxart do
         label: "yes",         # display text
         style: :dotted,       # :solid (default), :dotted, :thick
         bidirectional: true,  # arrows on both ends
-        arrow: false          # no arrow (T-junction instead)
+        arrow: false,         # no arrow (T-junction instead)
+        arrow_type: :circle   # :arrow (default), :circle, :cross
       ])
 
   ## Directions

@@ -101,10 +101,8 @@ defmodule Boxart.Render.Mindmap do
         nil
 
       _ ->
-        roots =
-          Enum.filter(vertices, fn v ->
-            Graph.in_neighbors(graph, v) == []
-          end)
+        in_targets = graph |> Graph.edges() |> MapSet.new(& &1.v2)
+        roots = Enum.reject(vertices, &MapSet.member?(in_targets, &1))
 
         root = if roots == [], do: hd(vertices), else: hd(roots)
         build_tree(graph, root, MapSet.new())
@@ -135,9 +133,17 @@ defmodule Boxart.Render.Mindmap do
 
   defp find_label(labels, vertex) do
     Enum.find_value(labels, to_string(vertex), fn
-      {key, val} when key == :label -> to_string(val)
-      kw when is_list(kw) -> Keyword.get(kw, :label) |> then(&if(&1, do: to_string(&1)))
-      _ -> nil
+      {key, val} when key == :label ->
+        to_string(val)
+
+      kw when is_list(kw) ->
+        case Keyword.get(kw, :label) do
+          nil -> nil
+          val -> to_string(val)
+        end
+
+      _ ->
+        nil
     end)
   end
 

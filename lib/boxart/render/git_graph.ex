@@ -95,7 +95,7 @@ defmodule Boxart.Render.GitGraph do
     use_ascii = Keyword.get(opts, :charset) == :ascii
 
     case diagram.direction do
-      :lr -> render_lr(diagram, cs, use_ascii)
+      dir when dir in [:tb, :bt] -> render_tb(diagram, cs, use_ascii, dir)
       _ -> render_lr(diagram, cs, use_ascii)
     end
   end
@@ -136,6 +136,143 @@ defmodule Boxart.Render.GitGraph do
     |> Canvas.render()
   end
 
+  defp render_tb(diagram, cs, use_ascii, dir) do
+    sorted = sort_branches(diagram)
+    commit_map = Map.new(diagram.commits, &{&1.id, &1})
+    branch_commits = group_commits_by_branch(diagram.commits, sorted)
+
+    max_label_w =
+      (Enum.map(sorted, &Utils.display_width/1) ++
+         Enum.map(diagram.commits, fn c ->
+           w = Utils.display_width(c.id)
+           if c.tag != "", do: max(w, Utils.display_width(c.tag) + 2), else: w
+         end))
+      |> Enum.max(fn -> 0 end)
+
+    col_gap = max(max_label_w + 4, 10)
+
+    branch_col =
+      sorted |> Enum.with_index() |> Map.new(fn {name, i} -> {name, @margin + i * col_gap} end)
+
+    row_gap = 4
+    n = length(diagram.commits)
+    label_row = @margin
+
+    commit_row =
+      diagram.commits
+      |> Enum.with_index()
+      |> Map.new(fn {c, i} ->
+        row =
+          if dir == :bt, do: @margin + (n - 1 - i) * row_gap + 3, else: @margin + i * row_gap + 3
+
+        {c.id, row}
+      end)
+
+    width = @margin + length(sorted) * col_gap + @margin
+    height = @margin + 3 + n * row_gap + @margin
+    canvas = Canvas.new(width, height)
+
+    v = cs.lines.vertical
+    h = cs.lines.horizontal
+
+    # Branch labels
+    canvas =
+      Enum.reduce(sorted, canvas, fn name, acc ->
+        col = Map.get(branch_col, name, 0)
+        lx = col - div(Utils.display_width(name), 2)
+        row = if dir == :bt, do: @margin + n * row_gap + 3, else: label_row
+        Canvas.put_text(acc, max(0, lx), row, name, style: "subgraph")
+      end)
+
+    # Branch lines (vertical)
+    canvas =
+      Enum.reduce(sorted, canvas, fn name, acc ->
+        draw_tb_branch_line(acc, name, branch_commits, commit_row, branch_col, v)
+      end)
+
+    # Fork/merge lines (horizontal)
+    canvas = draw_tb_forks(canvas, diagram, commit_row, branch_col, commit_map, h)
+
+    # Commits (last so markers are visible)
+    canvas = draw_tb_commits(canvas, diagram, branch_col, commit_row, use_ascii, dir)
+
+    Canvas.render(canvas)
+  end
+
+  defp draw_tb_branch_line(canvas, name, branch_commits, commit_row, branch_col, v) do
+    case Map.get(branch_commits, name, []) do
+      [] ->
+        canvas
+
+      commits ->
+        rows = Enum.map(commits, fn c -> Map.get(commit_row, c.id, 0) end)
+        col = Map.get(branch_col, name, 0)
+
+        Enum.reduce(
+          Enum.min(rows)..Enum.max(rows),
+          canvas,
+          &Canvas.put(&2, col, &1, v, style: "edge")
+        )
+    end
+  end
+
+  defp draw_tb_commits(canvas, diagram, branch_col, commit_row, use_ascii, dir) do
+    Enum.reduce(diagram.commits, canvas, fn c, acc ->
+      draw_tb_commit(acc, c, branch_col, commit_row, use_ascii, dir)
+    end)
+  end
+
+  defp draw_tb_commit(canvas, c, branch_col, commit_row, use_ascii, dir) do
+    col = Map.get(branch_col, c.branch, 0)
+    row = Map.get(commit_row, c.id, 0)
+    marker = marker_char(c.type, use_ascii)
+
+    canvas = Canvas.put(canvas, col, row, marker, merge: false, style: "node")
+    lx = col - div(Utils.display_width(c.id), 2)
+    label_r = if dir == :bt, do: row - 1, else: row + 1
+    canvas = Canvas.put_text(canvas, lx, label_r, c.id, style: "label")
+
+    if c.tag != "" do
+      tag = "[#{c.tag}]"
+      tx = col - div(Utils.display_width(tag), 2)
+      tag_r = if dir == :bt, do: row + 1, else: row - 1
+      Canvas.put_text(canvas, tx, tag_r, tag, style: "edge_label")
+    else
+      canvas
+    end
+  end
+
+  defp draw_tb_forks(canvas, diagram, commit_row, branch_col, commit_map, h) do
+    Enum.reduce(diagram.commits, canvas, fn c, acc ->
+      draw_commit_tb_forks(acc, c, commit_row, branch_col, commit_map, h)
+    end)
+  end
+
+  defp draw_commit_tb_forks(canvas, commit, commit_row, branch_col, commit_map, h) do
+    row = Map.get(commit_row, commit.id, 0)
+
+    Enum.reduce(commit.parents, canvas, fn pid, acc ->
+      case Map.get(commit_map, pid) do
+        nil ->
+          acc
+
+        %{branch: b} when b == commit.branch ->
+          acc
+
+        parent ->
+          src_col = Map.get(branch_col, parent.branch, 0)
+          tgt_col = Map.get(branch_col, commit.branch, 0)
+          draw_horizontal_connection(acc, row, src_col, tgt_col, h)
+      end
+    end)
+  end
+
+  defp draw_horizontal_connection(canvas, row, c1, c2, h_char) do
+    Enum.reduce(min(c1, c2)..max(c1, c2), canvas, fn c, acc ->
+      Canvas.put(acc, c, row, h_char, style: "edge")
+    end)
+  end
+
   defp sort_branches(%GitGraph{branches: branches, main_branch_name: main}) do
     branches
     |> Enum.with_index()
@@ -167,7 +304,7 @@ defmodule Boxart.Render.GitGraph do
   end
 
   defp compute_commit_cols(commits, sorted) do
-    branch_label_width = sorted |> Enum.map(&String.length/1) |> Enum.max(fn -> 0 end)
+    branch_label_width = sorted |> Enum.map(&Utils.display_width/1) |> Enum.max(fn -> 0 end)
     left_offset = @margin + branch_label_width + 2
 
     {cols, _} =
@@ -183,8 +320,8 @@ defmodule Boxart.Render.GitGraph do
   end
 
   defp commit_footprint(%Commit{id: id, tag: tag}) do
-    w = String.length(id)
-    w = if tag != "", do: max(w, String.length(tag) + 2), else: w
+    w = Utils.display_width(id)
+    w = if tag != "", do: max(w, Utils.display_width(tag) + 2), else: w
     div(w + 1, 2)
   end
 

@@ -366,6 +366,8 @@ defmodule Boxart.Canvas do
   """
   @spec render_ansi(t(), Boxart.Theme.t()) :: String.t()
   def render_ansi(%__MODULE__{} = canvas, %Boxart.Theme{} = theme) do
+    style_map = Boxart.Theme.to_map(theme)
+
     0..(canvas.height - 1)
     |> Enum.map(fn r ->
       row_cells =
@@ -374,7 +376,7 @@ defmodule Boxart.Canvas do
           {cell.char, cell.style}
         end
 
-      render_ansi_row(row_cells, theme)
+      render_ansi_row(row_cells, style_map)
     end)
     |> Enum.drop_while(&(&1 == ""))
     |> Enum.reverse()
@@ -383,20 +385,19 @@ defmodule Boxart.Canvas do
     |> Enum.join("\n")
   end
 
-  defp render_ansi_row(cells, theme) do
+  defp render_ansi_row(cells, style_map) do
     cells
     |> Enum.chunk_by(fn {_ch, style} -> style end)
-    |> Enum.map(&render_ansi_chunk(&1, theme))
+    |> Enum.map(&render_ansi_chunk(&1, style_map))
     |> IO.iodata_to_binary()
     |> String.trim_trailing()
   end
 
-  defp render_ansi_chunk(cells, theme) do
+  defp render_ansi_chunk(cells, style_map) do
     {chars, style_key} = {Enum.map(cells, &elem(&1, 0)), elem(hd(cells), 1)}
     text = Enum.join(chars)
-    ansi = Boxart.Theme.style_for(theme, style_key)
 
-    case ansi do
+    case Map.get(style_map, style_key, []) do
       [] -> text
       styles -> IO.ANSI.format(styles ++ [text], true)
     end

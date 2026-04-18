@@ -270,13 +270,18 @@ defmodule Boxart.Graph do
   end
 
   defp build_edge(v1, v2, label) when is_list(label) do
+    bidirectional = Keyword.get(label, :bidirectional, false)
+    has_arrow = Keyword.get(label, :arrow, true)
+
     %Edge{
       source: to_id(v1),
       target: to_id(v2),
       label: edge_label(Keyword.get(label, :label) || Keyword.get(label, :text, "")),
       style: Keyword.get(label, :style, :solid),
-      has_arrow_start: Keyword.get(label, :bidirectional, false),
-      has_arrow_end: Keyword.get(label, :arrow, true),
+      has_arrow_start: bidirectional,
+      has_arrow_end: has_arrow != false,
+      arrow_type_start: arrow_type_from(Keyword.get(label, :arrow_type, :arrow)),
+      arrow_type_end: arrow_type_from(Keyword.get(label, :arrow_type, :arrow)),
       min_length: Keyword.get(label, :min_length, 1)
     }
   end
@@ -288,6 +293,9 @@ defmodule Boxart.Graph do
       label: edge_label(label)
     }
   end
+
+  defp arrow_type_from(t) when t in [:arrow, :circle, :cross], do: t
+  defp arrow_type_from(_), do: :arrow
 
   defp to_id(v) when is_binary(v), do: v
   defp to_id(v) when is_atom(v), do: Atom.to_string(v)

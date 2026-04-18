@@ -282,6 +282,17 @@ defmodule Boxart.Render.Gantt do
   end
 
   defp truncate_label(text, max_w) do
-    if Utils.display_width(text) <= max_w, do: text, else: String.slice(text, 0, max_w - 1) <> "."
+    if Utils.display_width(text) <= max_w, do: text, else: truncate_by_width(text, max_w)
+  end
+
+  defp truncate_by_width(text, max_w) do
+    text
+    |> String.graphemes()
+    |> Enum.reduce_while({"", 0}, fn ch, {acc, w} ->
+      cw = Utils.display_width(ch)
+      if w + cw >= max_w, do: {:halt, {acc, w}}, else: {:cont, {acc <> ch, w + cw}}
+    end)
+    |> elem(0)
+    |> Kernel.<>(".")
   end
 end

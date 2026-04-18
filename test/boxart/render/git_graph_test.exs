@@ -121,5 +121,64 @@ defmodule Boxart.Render.GitGraphTest do
     test "empty diagram returns empty string" do
       assert GGRenderer.render(%GitGraph{}) == ""
     end
+
+    test "TB direction renders vertically" do
+      d = %GitGraph{
+        branches: [%Branch{name: "main"}, %Branch{name: "dev"}],
+        commits: [
+          %Commit{id: "a1", branch: "main"},
+          %Commit{id: "a2", branch: "dev", parents: ["a1"]},
+          %Commit{id: "a3", branch: "main", parents: ["a1", "a2"]}
+        ],
+        direction: :tb
+      }
+
+      out = GGRenderer.render(d)
+      assert String.contains?(out, "main")
+      assert String.contains?(out, "dev")
+      assert String.contains?(out, "a1")
+      assert String.contains?(out, "a3")
+      # TB: vertical lines
+      assert String.contains?(out, "│")
+    end
+
+    test "BT direction renders bottom-to-top" do
+      d = %GitGraph{
+        branches: [%Branch{name: "main"}],
+        commits: [
+          %Commit{id: "first", branch: "main"},
+          %Commit{id: "last", branch: "main"}
+        ],
+        direction: :bt
+      }
+
+      out = GGRenderer.render(d)
+      assert String.contains?(out, "first")
+      assert String.contains?(out, "last")
+    end
+  end
+
+  describe "edge keyword labels" do
+    test "arrow_type :circle renders circle endpoint" do
+      g =
+        Graph.new()
+        |> Graph.add_vertex("A")
+        |> Graph.add_vertex("B")
+        |> Graph.add_edge("A", "B", label: [arrow_type: :circle])
+
+      out = Boxart.render(g, direction: :lr)
+      assert String.contains?(out, "○")
+    end
+
+    test "arrow_type :cross renders cross endpoint" do
+      g =
+        Graph.new()
+        |> Graph.add_vertex("A")
+        |> Graph.add_vertex("B")
+        |> Graph.add_edge("A", "B", label: [arrow_type: :cross])
+
+      out = Boxart.render(g, direction: :lr)
+      assert String.contains?(out, "×")
+    end
   end
 end

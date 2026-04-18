@@ -59,7 +59,12 @@ defmodule Boxart.Theme do
   def get(:nord), do: nord()
   def get(:amber), do: amber()
   def get(:phosphor), do: phosphor()
-  def get(_), do: default()
+
+  def get(name) do
+    require Logger
+    Logger.warning("Unknown Boxart theme: #{inspect(name)}, using :default")
+    default()
+  end
 
   @doc false
   def default do
@@ -164,10 +169,12 @@ defmodule Boxart.Theme do
   """
   @spec style_for(t(), String.t()) :: ansi_style()
   def style_for(%__MODULE__{} = theme, key) do
-    Map.get(to_map(theme), key, [])
+    theme |> to_map() |> Map.get(key, [])
   end
 
-  defp to_map(theme) do
+  @doc "Converts the theme to a map of style key => ANSI atoms. Useful for precomputing."
+  @spec to_map(t()) :: %{String.t() => ansi_style()}
+  def to_map(%__MODULE__{} = theme) do
     %{
       "node" => theme.node,
       "edge" => theme.edge,
