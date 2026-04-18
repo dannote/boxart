@@ -159,6 +159,7 @@ defmodule Boxart.Layout do
     padding_x = Keyword.get(opts, :padding_x, 4)
     padding_y = Keyword.get(opts, :padding_y, 2)
     gap = max(Keyword.get(opts, :gap, 4), 1)
+    max_width = Keyword.get(opts, :max_width)
 
     direction = Graph.normalized(graph.direction)
 
@@ -167,20 +168,40 @@ defmodule Boxart.Layout do
     layer_order = Layers.order_layers(graph, layers)
     gap_expansions = Layers.compute_gap_expansions(graph, layer_order)
 
-    layout = %__MODULE__{}
-
     layout =
-      layout
-      |> Placement.place_nodes(graph, layer_order, direction, gap_expansions)
-      |> Placement.compute_sizes(graph, padding_x, padding_y, gap, opts)
-      |> Placement.normalize_sizes(graph)
-      |> Subgraphs.expand_gaps_for_subgraphs(graph, direction)
-      |> Coordinates.compute_draw_coords()
-      |> Subgraphs.compute_subgraph_bounds(graph)
-      |> Coordinates.adjust_for_negative_bounds()
-      |> compute_canvas_size()
+      do_layout(graph, layer_order, direction, gap_expansions, padding_x, padding_y, gap, opts)
 
-    layout
+    if max_width && layout.canvas_width > max_width do
+      stacked_order = Enum.flat_map(layer_order, fn layer -> Enum.map(layer, &[&1]) end)
+
+      stacked =
+        do_layout(
+          graph,
+          stacked_order,
+          direction,
+          gap_expansions,
+          padding_x,
+          padding_y,
+          gap,
+          opts
+        )
+
+      if stacked.canvas_width < layout.canvas_width, do: stacked, else: layout
+    else
+      layout
+    end
+  end
+
+  defp do_layout(graph, layer_order, direction, gap_expansions, padding_x, padding_y, gap, opts) do
+    %__MODULE__{}
+    |> Placement.place_nodes(graph, layer_order, direction, gap_expansions)
+    |> Placement.compute_sizes(graph, padding_x, padding_y, gap, opts)
+    |> Placement.normalize_sizes(graph)
+    |> Subgraphs.expand_gaps_for_subgraphs(graph, direction)
+    |> Coordinates.compute_draw_coords()
+    |> Subgraphs.compute_subgraph_bounds(graph)
+    |> Coordinates.adjust_for_negative_bounds()
+    |> compute_canvas_size()
   end
 
   defp compute_canvas_size(%__MODULE__{placements: placements, subgraph_bounds: bounds} = layout) do

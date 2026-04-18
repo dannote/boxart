@@ -112,7 +112,7 @@ defmodule Boxart.Render do
 
   def render_graph_canvas(%BGraph{} = graph, opts) do
     cs = charset_from_opts(opts)
-    layout_opts = Keyword.take(opts, [:padding_x, :padding_y, :gap, :max_label_width])
+    layout_opts = Keyword.take(opts, [:padding_x, :padding_y, :gap, :max_label_width, :max_width])
 
     {graph, needs_v_flip, needs_h_flip} = normalize_direction(graph)
 
