@@ -46,7 +46,7 @@ defmodule Boxart.Render do
 
         canvas =
           if max_width && canvas.width > max_width do
-            try_reflow(graph, opts, max_width, canvas)
+            try_compact(graph, opts, max_width, canvas)
           else
             canvas
           end
@@ -55,38 +55,31 @@ defmodule Boxart.Render do
     end
   end
 
-  defp try_reflow(graph, opts, max_width, original_canvas) do
-    # Try flipping direction: TD->LR puts siblings vertically
-    flipped_dir =
-      case graph.direction do
-        dir when dir in [:td, :tb] -> :lr
-        dir when dir in [:lr] -> :td
-        _ -> nil
-      end
+  defp try_compact(graph, opts, max_width, original_canvas) do
+    base_gap = Keyword.get(opts, :gap, 4)
 
-    if flipped_dir do
-      flipped_graph = %{graph | direction: flipped_dir}
-      flipped_opts = Keyword.delete(opts, :max_width)
+    compact_steps = [
+      [gap: min(base_gap, 2)],
+      [gap: 1],
+      [gap: 1, padding_x: 2],
+      [gap: 1, padding_x: 0, padding_y: 0]
+    ]
 
-      case render_graph_canvas(flipped_graph, flipped_opts) do
+    Enum.reduce_while(compact_steps, original_canvas, fn overrides, best ->
+      step_opts = Keyword.merge(opts, overrides) |> Keyword.delete(:max_width)
+
+      case render_graph_canvas(graph, step_opts) do
         nil ->
-          Canvas.clamp_width(original_canvas, max_width)
+          {:cont, best}
 
-        flipped_canvas ->
-          if flipped_canvas.width <= max_width do
-            flipped_canvas
+        canvas ->
+          if canvas.width <= max_width do
+            {:halt, canvas}
           else
-            # Neither direction fits — use whichever is narrower, clamped
-            if flipped_canvas.width < original_canvas.width do
-              Canvas.clamp_width(flipped_canvas, max_width)
-            else
-              Canvas.clamp_width(original_canvas, max_width)
-            end
+            if canvas.width < best.width, do: {:cont, canvas}, else: {:cont, best}
           end
       end
-    else
-      Canvas.clamp_width(original_canvas, max_width)
-    end
+    end)
   end
 
   defp render_canvas_to_string(canvas, opts) do
