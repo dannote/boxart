@@ -163,11 +163,11 @@ Custom themes via struct:
 
 ```elixir
 theme = %Boxart.Theme{
-  node: [:blue],
-  edge: [:faint],
-  arrow: [:red, :bright],
-  label: [:bright],
-  edge_label: [:italic, :faint]
+  node: ~w[blue]a,
+  edge: ~w[faint]a,
+  arrow: ~w[red bright]a,
+  label: ~w[bright]a,
+  edge_label: ~w[italic faint]a
 }
 
 Boxart.render(graph, theme: theme)
