@@ -26,6 +26,8 @@ defmodule Boxart.Render.Gantt do
       Gantt.render(diagram) |> IO.puts()
   """
 
+  @behaviour Boxart.Diagram
+
   alias Boxart.Canvas
   alias Boxart.Utils
 
@@ -88,6 +90,7 @@ defmodule Boxart.Render.Gantt do
     * `:width` — chart width in characters (default: `80`)
   """
   @spec render(Gantt.t(), keyword()) :: String.t()
+  @impl true
   def render(diagram, opts \\ [])
   def render(%Gantt{sections: []}, _opts), do: ""
 

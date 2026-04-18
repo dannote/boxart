@@ -6,6 +6,8 @@ defmodule Boxart.Render.PieChart do
   with percentage labels. Uses `Boxart.Canvas` for rendering.
   """
 
+  @behaviour Boxart.Diagram
+
   alias Boxart.Canvas
   alias Boxart.Utils
 
@@ -32,6 +34,7 @@ defmodule Boxart.Render.PieChart do
     * `:charset` — `:unicode` (default) or `:ascii`
   """
   @spec render(PieChart.t(), keyword()) :: String.t()
+  @impl true
   def render(%PieChart{} = chart, opts \\ []) do
     chart
     |> render_canvas(opts)

@@ -29,6 +29,8 @@ defmodule Boxart.Render.StateDiagram do
       StateDiagram.render(diagram) |> IO.puts()
   """
 
+  @behaviour Boxart.Diagram
+
   defmodule State do
     @moduledoc "A state in the diagram."
 
@@ -77,6 +79,7 @@ defmodule Boxart.Render.StateDiagram do
     * `:direction` — `:td` (default) or `:lr`
   """
   @spec render(StateDiagram.t(), keyword()) :: String.t()
+  @impl true
   def render(%StateDiagram{} = diagram, opts \\ []) do
     direction = Keyword.get(opts, :direction, :td)
 

@@ -9,6 +9,8 @@ defmodule Boxart.Render.Sequence do
   Uses `Boxart.Canvas` for all drawing operations.
   """
 
+  @behaviour Boxart.Diagram
+
   alias Boxart.Canvas
   alias Boxart.Charset
   alias Boxart.Render.Shapes
@@ -129,6 +131,7 @@ defmodule Boxart.Render.Sequence do
     * `:gap` — minimum gap between participant centers (default: `#{@min_gap}`)
   """
   @spec render(SequenceDiagram.t(), keyword()) :: String.t()
+  @impl true
   def render(%SequenceDiagram{} = diagram, opts \\ []) do
     diagram
     |> render_canvas(opts)

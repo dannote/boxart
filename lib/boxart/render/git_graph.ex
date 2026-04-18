@@ -24,6 +24,8 @@ defmodule Boxart.Render.GitGraph do
       GitGraph.render(diagram) |> IO.puts()
   """
 
+  @behaviour Boxart.Diagram
+
   alias Boxart.Canvas
   alias Boxart.Charset
   alias Boxart.Utils
@@ -84,6 +86,7 @@ defmodule Boxart.Render.GitGraph do
     * `:charset` — `:unicode` (default) or `:ascii`
   """
   @spec render(GitGraph.t(), keyword()) :: String.t()
+  @impl true
   def render(diagram, opts \\ [])
   def render(%GitGraph{commits: []}, _opts), do: ""
 

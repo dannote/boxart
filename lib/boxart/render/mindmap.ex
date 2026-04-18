@@ -10,6 +10,8 @@ defmodule Boxart.Render.Mindmap do
   rather than using `Boxart.Canvas`.
   """
 
+  @behaviour Boxart.Diagram
+
   alias Boxart.Utils
 
   @overflow_threshold 6
@@ -46,6 +48,7 @@ defmodule Boxart.Render.Mindmap do
     * `:rounded` — use rounded corners (default: `true`, only with `:unicode`)
   """
   @spec render(MindmapNode.t() | nil, keyword()) :: String.t()
+  @impl true
   def render(root, opts \\ [])
 
   def render(nil, _opts), do: ""
