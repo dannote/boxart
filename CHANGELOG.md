@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.3.1
+
+### Bug fixes
+
+- **Stacked layout gap inflation** — when `max_width` triggered vertical stacking,
+  gap expansions computed for the wide layout were incorrectly reused, adding
+  excessive vertical space between every node pair
+- **Mindmap multi-line labels** — labels containing `\n` were inserted raw into
+  connector strings, breaking line alignment. Now joined with ` · ` for inline
+  display
+- Gap expansion limited to source/target layers only — intermediate gaps that
+  just carry straight vertical lines no longer get inflated
+
 ## v0.3.0
 
 ### New features
