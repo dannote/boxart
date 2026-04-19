@@ -122,7 +122,11 @@ defmodule Boxart.Layout.Layers do
       lo = min(src_layer, tgt_layer)
       hi = max(src_layer, tgt_layer)
 
-      Enum.reduce(lo..(hi - 1)//1, acc, fn gap_idx, acc2 ->
+      # Only expand gaps near source/target where edges turn.
+      # Intermediate gaps just carry straight vertical lines.
+      gaps = [lo, hi - 1] |> Enum.uniq() |> Enum.filter(&(&1 >= lo and &1 < hi))
+
+      Enum.reduce(gaps, acc, fn gap_idx, acc2 ->
         Map.update(acc2, gap_idx, 1, &(&1 + 1))
       end)
     else

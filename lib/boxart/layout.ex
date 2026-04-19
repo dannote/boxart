@@ -174,13 +174,14 @@ defmodule Boxart.Layout do
 
     if max_width && layout.canvas_width > max_width do
       stacked_order = Enum.flat_map(layer_order, fn layer -> Enum.map(layer, &[&1]) end)
+      stacked_gap_expansions = Layers.compute_gap_expansions(graph, stacked_order)
 
       stacked =
         do_layout(
           graph,
           stacked_order,
           direction,
-          gap_expansions,
+          stacked_gap_expansions,
           padding_x,
           padding_y,
           gap,

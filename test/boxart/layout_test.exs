@@ -173,4 +173,24 @@ defmodule Boxart.LayoutTest do
       assert layout.canvas_height > 0
     end
   end
+
+  describe "stacked layout compaction" do
+    test "stacked layout does not inflate gaps from wide layout" do
+      edges =
+        for i <- 0..7, do: {"N#{i}", "N#{i + 1}"}
+
+      skip_edges =
+        for i <- 0..5, do: {"N#{i}", "Target"}
+
+      g = graph(:td, edges ++ skip_edges, ["Target"])
+
+      wide = Layout.compute_layout(g)
+      stacked = Layout.compute_layout(g, max_width: 40)
+
+      lines_per_node = 8
+      max_expected = map_size(stacked.placements) * lines_per_node
+      assert stacked.canvas_height <= max_expected
+      assert stacked.canvas_width <= 40 || stacked.canvas_width < wide.canvas_width
+    end
+  end
 end
