@@ -94,7 +94,7 @@ defmodule Boxart.Render.PieChart do
       pct = :erlang.float_to_binary(value / total * 100, decimals: 1)
 
       if show_data,
-        do: " #{String.pad_leading(pct, 5)}%  [#{value}]",
+        do: " #{String.pad_leading(pct, 5)}%  [#{format_data_value(value)}]",
         else: " #{String.pad_leading(pct, 5)}%"
     end)
   end
@@ -207,6 +207,12 @@ defmodule Boxart.Render.PieChart do
   end
 
   defp fill_char(fills, index), do: Enum.at(fills, rem(index, length(fills)))
+
+  defp format_data_value(value) when is_integer(value), do: Integer.to_string(value)
+
+  defp format_data_value(value) when is_float(value) do
+    :io_lib.format("~g", [value]) |> IO.iodata_to_binary() |> String.replace(~r/\.?0+$/, "")
+  end
 
   defdelegate rjust(str, width), to: Utils
 end

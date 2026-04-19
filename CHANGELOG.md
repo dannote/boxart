@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.2
+
+### Bug fixes
+
+- **Pie chart FP noise** — `show_data: true` displayed raw IEEE 754 artifacts
+  like `[5.8999999999999995]`. Now uses `~g` formatting (6 significant digits,
+  trailing zeros stripped) matching the Python original.
+
 ## v0.3.1
 
 ### Bug fixes
