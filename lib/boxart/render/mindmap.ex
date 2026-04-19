@@ -74,7 +74,7 @@ defmodule Boxart.Render.Mindmap do
     end
   end
 
-  def render(%MindmapNode{children: []} = root, _opts), do: root.label
+  def render(%MindmapNode{children: []} = root, _opts), do: inline_label(root.label)
 
   def render(%MindmapNode{} = root, opts) do
     ch = make_chars(opts)
@@ -87,7 +87,7 @@ defmodule Boxart.Render.Mindmap do
 
         block
       else
-        render_both_sides(root.label, left_children, right_children, ch)
+        render_both_sides(inline_label(root.label), left_children, right_children, ch)
       end
 
     Enum.join(lines, "\n")
@@ -202,12 +202,15 @@ defmodule Boxart.Render.Mindmap do
 
   # Right-branching subtree
 
-  defp render_subtree_right(%MindmapNode{children: []} = node, _ch), do: {[node.label], 0}
+  defp render_subtree_right(%MindmapNode{children: []} = node, _ch) do
+    {[inline_label(node.label)], 0}
+  end
 
   defp render_subtree_right(%MindmapNode{} = node, ch) do
     {child_block, child_conn} = stack_right(node.children, ch)
+    label = inline_label(node.label)
 
-    connector = node.label <> " " <> ch.h <> ch.h
+    connector = label <> " " <> ch.h <> ch.h
     pad = String.duplicate(" ", Utils.display_width(connector))
 
     result =
@@ -272,14 +275,17 @@ defmodule Boxart.Render.Mindmap do
 
   # Left-branching subtree (mirrored)
 
-  defp render_subtree_left(%MindmapNode{children: []} = node, _ch), do: {[node.label], 0}
+  defp render_subtree_left(%MindmapNode{children: []} = node, _ch) do
+    {[inline_label(node.label)], 0}
+  end
 
   defp render_subtree_left(%MindmapNode{} = node, ch) do
     {child_block, child_conn} = stack_left(node.children, ch)
     child_width = max_display_width(child_block)
     child_block = Enum.map(child_block, &rjust(&1, child_width))
+    label = inline_label(node.label)
 
-    connector = ch.h <> ch.h <> " " <> node.label
+    connector = ch.h <> ch.h <> " " <> label
     pad = String.duplicate(" ", Utils.display_width(connector))
 
     result =
@@ -435,6 +441,12 @@ defmodule Boxart.Render.Mindmap do
 
   defp max_display_width(lines) do
     Enum.reduce(lines, 0, fn l, acc -> max(acc, Utils.display_width(l)) end)
+  end
+
+  defp inline_label(label) do
+    label
+    |> String.replace("\n", " \u00b7 ")
+    |> String.replace("\\n", " \u00b7 ")
   end
 
   defdelegate rjust(str, width), to: Utils

@@ -199,3 +199,26 @@ defmodule Boxart.Render.MindmapTest do
     end
   end
 end
+
+defmodule Boxart.Render.MindmapMultilineTest do
+  use ExUnit.Case, async: true
+
+  alias Boxart.Render.Mindmap
+
+  test "multi-line labels render inline" do
+    g =
+      Graph.new()
+      |> Graph.add_vertex(:root, label: "Root\nMetric=5")
+      |> Graph.add_vertex(:child, label: "Child\nValue=3")
+      |> Graph.add_edge(:root, :child)
+
+    output = Mindmap.render(g)
+    lines = String.split(output, "\n")
+
+    assert length(lines) == 1
+    assert String.contains?(output, "Root")
+    assert String.contains?(output, "Metric=5")
+    assert String.contains?(output, "Child")
+    assert String.contains?(output, "Value=3")
+  end
+end
