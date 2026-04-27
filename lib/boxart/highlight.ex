@@ -44,9 +44,12 @@ defmodule Boxart.Highlight do
   @spec format_tokens([{atom(), keyword(), String.t() | [any()]}]) :: [styled_segment()]
   def format_tokens(tokens) do
     Enum.map(tokens, fn {type, _meta, text} ->
-      {IO.iodata_to_binary(List.wrap(text)), ansi_for_type(type)}
+      {token_text_to_string(text), ansi_for_type(type)}
     end)
   end
+
+  defp token_text_to_string(text) when is_binary(text), do: text
+  defp token_text_to_string(text), do: IO.chardata_to_string(List.wrap(text))
 
   @doc """
   Returns a single ANSI-colored string for the given source and language.

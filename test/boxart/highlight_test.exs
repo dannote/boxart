@@ -44,6 +44,12 @@ defmodule Boxart.HighlightTest do
 
       assert [{"def", "\e[35m"}, {" ", ""}, {"foo", "\e[34m"}] = result
     end
+
+    test "accepts Unicode chardata token text" do
+      tokens = [{:string, %{}, [?“, "section", ?”]}]
+
+      assert [{"“section”", "\e[32m"}] = Highlight.format_tokens(tokens)
+    end
   end
 
   describe "to_ansi_string/2" do
