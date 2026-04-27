@@ -211,7 +211,15 @@ defmodule Boxart.Render.PieChart do
   defp format_data_value(value) when is_integer(value), do: Integer.to_string(value)
 
   defp format_data_value(value) when is_float(value) do
-    :io_lib.format("~g", [value]) |> IO.iodata_to_binary() |> String.replace(~r/\.?0+$/, "")
+    :io_lib.format("~g", [value])
+    |> IO.iodata_to_binary()
+    |> trim_float_suffix()
+  end
+
+  defp trim_float_suffix(value) do
+    value
+    |> String.trim_trailing("0")
+    |> String.trim_trailing(".")
   end
 
   defdelegate rjust(str, width), to: Utils

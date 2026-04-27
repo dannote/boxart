@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.3
+
+### Bug fixes
+
+- **Unicode syntax highlighting tokens** — Makeup token text can be chardata
+  containing Unicode codepoints. Highlight formatting now uses Unicode-safe
+  chardata conversion instead of byte-only iodata conversion, preventing crashes
+  when rendering code nodes with characters like curly quotes.
+
 ## v0.3.2
 
 ### Bug fixes

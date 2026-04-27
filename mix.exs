@@ -1,7 +1,7 @@
 defmodule Boxart.MixProject do
   use Mix.Project
 
-  @version "0.3.2"
+  @version "0.3.3"
   @source_url "https://github.com/dannote/boxart"
 
   def project do
